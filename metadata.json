@@ -1,0 +1,8 @@
+
+{
+  "name": "BuildGo Construction Marketplace",
+  "description": "A comprehensive construction materials marketplace featuring store listings, product catalogs, shopping cart, and AI-powered material estimation.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
