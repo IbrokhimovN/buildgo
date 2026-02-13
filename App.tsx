@@ -12,6 +12,18 @@ import {
   ApiError,
 } from './services/api';
 
+
+function getInitialView(): ViewState {
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get('mode');
+
+  if (mode === 'seller') {
+    return 'SELLER';
+  }
+
+  return 'HOME';
+}
+
 // --- Types ---
 interface CartItem {
   product: ApiProduct;
@@ -1007,12 +1019,9 @@ const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
 // --- Main App ---
 
 export default function App() {
-  const [view, setView] = useState<ViewState>(() => {
-    if (window.location.pathname === '/seller') {
-      return 'SELLER';
-    }
-    return 'HOME';
-  });
+  
+  const [view, setView] = useState<ViewState>(() => getInitialView());
+
 
   // Data from hooks
   const { stores, isLoading: isLoadingStores, error: storesError, refetch: fetchStores } = useStores();
@@ -1050,11 +1059,7 @@ export default function App() {
   // Listen for URL changes (popstate)
   useEffect(() => {
     const handlePopState = () => {
-      if (window.location.pathname === '/seller') {
-        setView('SELLER');
-      } else {
-        setView('HOME');
-      }
+      setView(getInitialView());
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
