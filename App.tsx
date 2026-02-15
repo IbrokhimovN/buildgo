@@ -11,13 +11,18 @@ import {
   ApiLocation,
   ApiError,
 } from './services/api';
+import { useAuth, AuthUser } from './context/AuthContext';
 
 
-function getInitialView(): ViewState {
+function getRequestedMode(): string | null {
   const params = new URLSearchParams(window.location.search);
-  const mode = params.get('mode');
+  return params.get('mode');
+}
 
-  if (mode === 'seller') {
+function getInitialView(userRole?: string): ViewState {
+  const mode = getRequestedMode();
+
+  if (mode === 'seller' && userRole === 'seller') {
     return 'SELLER';
   }
 
@@ -660,15 +665,15 @@ const CheckoutView = ({
   const [error, setError] = useState<string | null>(null);
   const { locations, isLoading: isLoadingLocations } = useLocations();
 
-  // Pre-fill from Telegram if available
+  // Pre-fill from auth user
+  const { user: authUser } = useAuth();
   useEffect(() => {
-    // @ts-ignore
-    const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    if (tgUser) {
-      if (tgUser.first_name && !firstName) setFirstName(tgUser.first_name);
-      if (tgUser.last_name && !lastName) setLastName(tgUser.last_name);
+    if (authUser) {
+      if (authUser.first_name && !firstName) setFirstName(authUser.first_name);
+      if (authUser.last_name && !lastName) setLastName(authUser.last_name);
+      if (authUser.phone && !phone) setPhone(authUser.phone);
     }
-  }, []);
+  }, [authUser]);
 
   // Auto-select default location
   useEffect(() => {
@@ -959,8 +964,12 @@ const OrdersHistoryView = ({ onBack }: { onBack: () => void }) => {
 
 // --- Profile View ---
 const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
-  // @ts-ignore
-  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  const { user, logout } = useAuth();
+
+  const roleLabels: Record<string, string> = {
+    buyer: 'Xaridor',
+    seller: 'Sotuvchi',
+  };
 
   return (
     <div className="pb-32">
@@ -976,11 +985,16 @@ const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
           </div>
           <div>
             <p className="font-bold text-lg">
-              {tgUser ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() : 'Foydalanuvchi'}
+              {user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Foydalanuvchi'}
             </p>
             <p className="text-gray-500 text-sm">
-              {tgUser?.username ? `@${tgUser.username}` : 'Telegram orqali'}
+              {user?.phone || 'Telegram orqali'}
             </p>
+            {user?.role && (
+              <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded">
+                {roleLabels[user.role] || user.role}
+              </span>
+            )}
           </div>
         </div>
 
@@ -1011,6 +1025,15 @@ const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
             <Icon name="chevron_right" className="text-gray-400" />
           </button>
         </div>
+
+        {/* Logout Button */}
+        <button
+          onClick={logout}
+          className="w-full mt-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold py-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+        >
+          <Icon name="logout" />
+          Chiqish
+        </button>
       </div>
     </div>
   );
@@ -1019,11 +1042,12 @@ const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
 // --- Main App ---
 
 export default function App() {
-  
-  const [view, setView] = useState<ViewState>(() => getInitialView());
+  const { user, isAuthenticated, isLoading: isAuthLoading, error: authError, login } = useAuth();
 
+  const [view, setView] = useState<ViewState>('HOME');
+  const [sellerAccessDenied, setSellerAccessDenied] = useState(false);
 
-  // Data from hooks
+  // Data from hooks — MUST be called before any early returns (Rules of Hooks)
   const { stores, isLoading: isLoadingStores, error: storesError, refetch: fetchStores } = useStores();
   const {
     items: cart,
@@ -1042,6 +1066,20 @@ export default function App() {
   const [lastOrder, setLastOrder] = useState<ApiOrder | null>(null);
   const [previousView, setPreviousView] = useState<ViewState>('HOME');
 
+  // Once auth completes, determine initial view based on user role
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated && user) {
+      const mode = getRequestedMode();
+      if (mode === 'seller') {
+        if (user.role === 'seller') {
+          setView('SELLER');
+        } else {
+          setSellerAccessDenied(true);
+        }
+      }
+    }
+  }, [isAuthLoading, isAuthenticated, user]);
+
   // Wrapper around addItem that handles multi-store conflicts with a confirm dialog
   const addToCart = (product: ApiProduct, quantity: number) => {
     const result = addItem(product, quantity);
@@ -1059,11 +1097,11 @@ export default function App() {
   // Listen for URL changes (popstate)
   useEffect(() => {
     const handlePopState = () => {
-      setView(getInitialView());
+      setView(getInitialView(user?.role));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [user]);
 
   // Order submission — throws on failure so CheckoutView can display errors
   const handleCheckout = async (data: { firstName: string; lastName: string; phone: string; address: string; locationId?: number }) => {
@@ -1095,6 +1133,66 @@ export default function App() {
 
 
   const renderContent = () => {
+    // Auth loading screen
+    if (isAuthLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-500">Avtorizatsiya...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Auth error screen
+    if (authError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6">
+          <div className="text-center">
+            <div className="size-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="error" className="text-3xl text-red-500" />
+            </div>
+            <h2 className="text-lg font-bold mb-2">Avtorizatsiya xatoligi</h2>
+            <p className="text-gray-500 mb-6">{authError}</p>
+            <button
+              onClick={login}
+              className="bg-primary text-white px-8 py-3 rounded-xl font-bold"
+            >
+              Qayta urinish
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Seller access denied screen
+    if (sellerAccessDenied) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6">
+          <div className="text-center">
+            <div className="size-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="block" className="text-3xl text-yellow-600" />
+            </div>
+            <h2 className="text-lg font-bold mb-2">Kirish taqiqlangan</h2>
+            <p className="text-gray-500 mb-6">
+              Sotuvchi paneliga kirish uchun sizda ruxsat yo'q. Faqat sotuvchi rolga ega foydalanuvchilar kirishi mumkin.
+            </p>
+            <button
+              onClick={() => {
+                setSellerAccessDenied(false);
+                window.history.pushState({}, '', '/');
+                setView('HOME');
+              }}
+              className="bg-primary text-white px-8 py-3 rounded-xl font-bold"
+            >
+              Bosh sahifaga qaytish
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     switch (view) {
       case 'HOME':
         return (
@@ -1190,13 +1288,14 @@ export default function App() {
     }
   };
 
+  const showTabBar = !isAuthLoading && !authError && !sellerAccessDenied &&
+    view !== 'CHECKOUT' && view !== 'SELLER' && view !== 'ORDER_SUCCESS';
+
   return (
     <div className="max-w-lg mx-auto bg-background-light dark:bg-background-dark min-h-screen relative font-sans text-gray-900 dark:text-white overflow-x-hidden">
       {renderContent()}
 
-
-
-      {view !== 'CHECKOUT' && view !== 'SELLER' && view !== 'ORDER_SUCCESS' && (
+      {showTabBar && (
         <TabBar
           currentView={view === 'ORDERS' ? 'PROFILE' as ViewState : view}
           setView={setView}
@@ -1206,3 +1305,4 @@ export default function App() {
     </div>
   );
 }
+

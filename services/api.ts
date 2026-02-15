@@ -1,17 +1,10 @@
 /**
  * BuildGo API Service
- * Complete API layer for Seller and Buyer apps
+ * Complete API layer for Seller and Buyer apps.
+ * All requests use authFetch for automatic JWT handling.
  */
 
-// Use relative URL if running locally (Vite proxy handles /api), full URL in production (Telegram WebApp)
-// @ts-ignore
-const BASE_URL = window.Telegram?.WebApp?.initData ? 'https://buildgo.uz' : '';
-
-// Get Telegram init data from window (Telegram Mini App)
-const getTelegramInitData = (): string => {
-    // @ts-ignore - Telegram WebApp global
-    return window.Telegram?.WebApp?.initData || '';
-};
+import { authFetch, BASE_URL } from './authClient';
 
 // --- Types matching Backend API ---
 
@@ -126,49 +119,31 @@ async function handleResponse<T>(response: Response): Promise<T> {
     return response.json();
 }
 
-function getAuthHeaders(): HeadersInit {
-    return {
-        'Content-Type': 'application/json',
-        'X-Telegram-Init-Data': getTelegramInitData(),
-    };
-}
-
 // --- Authentication API ---
 
 export const authApi = {
     /**
-     * Register or update buyer via Telegram auth
+     * Get current user profile
      */
-    async registerBuyer(data: {
-        telegram_id: number;
-        first_name: string;
-        last_name: string;
-        phone: string;
-    }): Promise<ApiUser> {
-        const response = await fetch(`${BASE_URL}/api/telegram-auth/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
+    async getMe(): Promise<ApiUser> {
+        const response = await authFetch(`${BASE_URL}/api/me/`);
         return handleResponse<ApiUser>(response);
     },
 
     /**
-     * Check if user is a seller
+     * Get seller profile (requires seller role)
      */
-    async checkSeller(telegramId: number): Promise<{ is_seller: boolean; seller?: ApiSeller }> {
-        const response = await fetch(`${BASE_URL}/api/check-seller/?telegram_id=${telegramId}`);
-        return handleResponse(response);
+    async getSellerProfile(): Promise<ApiSeller> {
+        const response = await authFetch(`${BASE_URL}/api/seller/me/`);
+        return handleResponse<ApiSeller>(response);
     },
 
     /**
-     * Get current seller profile (requires Telegram auth)
+     * Get seller dashboard data
      */
-    async getSellerProfile(): Promise<ApiSeller> {
-        const response = await fetch(`${BASE_URL}/api/seller/me/`, {
-            headers: getAuthHeaders(),
-        });
-        return handleResponse<ApiSeller>(response);
+    async getSellerDashboard(): Promise<unknown> {
+        const response = await authFetch(`${BASE_URL}/api/seller/dashboard/`);
+        return handleResponse(response);
     },
 };
 
@@ -179,9 +154,7 @@ export const buyerApi = {
      * List all stores
      */
     async getStores(page = 1): Promise<PaginatedResponse<ApiStore>> {
-        const response = await fetch(`${BASE_URL}/api/stores/?page=${page}`, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(`${BASE_URL}/api/stores/?page=${page}`);
         return handleResponse(response);
     },
 
@@ -189,9 +162,7 @@ export const buyerApi = {
      * Get categories for a store
      */
     async getStoreCategories(storeId: number): Promise<PaginatedResponse<ApiCategory>> {
-        const response = await fetch(`${BASE_URL}/api/stores/${storeId}/categories/`, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(`${BASE_URL}/api/stores/${storeId}/categories/`);
         return handleResponse(response);
     },
 
@@ -205,9 +176,7 @@ export const buyerApi = {
     ): Promise<PaginatedResponse<ApiProduct>> {
         let url = `${BASE_URL}/api/stores/${storeId}/products/?page=${page}`;
         if (categoryId) url += `&category=${categoryId}`;
-        const response = await fetch(url, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(url);
         return handleResponse(response);
     },
 
@@ -215,9 +184,7 @@ export const buyerApi = {
      * Search products across all stores
      */
     async searchProducts(query: string): Promise<PaginatedResponse<ApiProduct>> {
-        const response = await fetch(`${BASE_URL}/api/search/?q=${encodeURIComponent(query)}`, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(`${BASE_URL}/api/search/?q=${encodeURIComponent(query)}`);
         return handleResponse(response);
     },
 
@@ -232,9 +199,9 @@ export const buyerApi = {
         last_name?: string;
         phone?: string;
     }): Promise<ApiOrder> {
-        const response = await fetch(`${BASE_URL}/api/orders/`, {
+        const response = await authFetch(`${BASE_URL}/api/orders/`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
         return handleResponse<ApiOrder>(response);
@@ -244,9 +211,7 @@ export const buyerApi = {
      * Get buyer's order history
      */
     async getOrders(page = 1): Promise<PaginatedResponse<ApiOrder>> {
-        const response = await fetch(`${BASE_URL}/api/orders/?page=${page}`, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(`${BASE_URL}/api/orders/?page=${page}`);
         return handleResponse(response);
     },
 
@@ -254,9 +219,7 @@ export const buyerApi = {
      * Get buyer's saved locations
      */
     async getLocations(): Promise<PaginatedResponse<ApiLocation>> {
-        const response = await fetch(`${BASE_URL}/api/locations/`, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(`${BASE_URL}/api/locations/`);
         return handleResponse(response);
     },
 
@@ -270,9 +233,9 @@ export const buyerApi = {
         longitude?: number;
         is_default?: boolean;
     }): Promise<ApiLocation> {
-        const response = await fetch(`${BASE_URL}/api/locations/`, {
+        const response = await authFetch(`${BASE_URL}/api/locations/`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
         return handleResponse<ApiLocation>(response);
@@ -291,9 +254,9 @@ export const buyerApi = {
             is_default: boolean;
         }>
     ): Promise<ApiLocation> {
-        const response = await fetch(`${BASE_URL}/api/locations/${locationId}/`, {
+        const response = await authFetch(`${BASE_URL}/api/locations/${locationId}/`, {
             method: 'PATCH',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
         return handleResponse<ApiLocation>(response);
@@ -303,9 +266,8 @@ export const buyerApi = {
      * Delete a location
      */
     async deleteLocation(locationId: number): Promise<void> {
-        const response = await fetch(`${BASE_URL}/api/locations/${locationId}/`, {
+        const response = await authFetch(`${BASE_URL}/api/locations/${locationId}/`, {
             method: 'DELETE',
-            headers: getAuthHeaders(),
         });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -321,9 +283,7 @@ export const sellerApi = {
      * Get seller's orders
      */
     async getOrders(page = 1): Promise<PaginatedResponse<ApiOrder>> {
-        const response = await fetch(`${BASE_URL}/api/seller/orders/?page=${page}`, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(`${BASE_URL}/api/seller/orders/?page=${page}`);
         return handleResponse(response);
     },
 
@@ -334,9 +294,9 @@ export const sellerApi = {
         orderId: number,
         status: 'new' | 'done' | 'cancelled'
     ): Promise<ApiOrder> {
-        const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/`, {
+        const response = await authFetch(`${BASE_URL}/api/seller/orders/${orderId}/`, {
             method: 'PATCH',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status }),
         });
         return handleResponse<ApiOrder>(response);
@@ -346,9 +306,7 @@ export const sellerApi = {
      * Get seller's products
      */
     async getProducts(page = 1): Promise<PaginatedResponse<ApiProduct>> {
-        const response = await fetch(`${BASE_URL}/api/seller/products/?page=${page}`, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(`${BASE_URL}/api/seller/products/?page=${page}`);
         return handleResponse(response);
     },
 
@@ -362,9 +320,9 @@ export const sellerApi = {
         unit: string;
         is_available?: boolean;
     }): Promise<ApiProduct> {
-        const response = await fetch(`${BASE_URL}/api/seller/products/`, {
+        const response = await authFetch(`${BASE_URL}/api/seller/products/`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
         return handleResponse<ApiProduct>(response);
@@ -383,9 +341,9 @@ export const sellerApi = {
             is_available: boolean;
         }>
     ): Promise<ApiProduct> {
-        const response = await fetch(`${BASE_URL}/api/seller/products/${productId}/`, {
+        const response = await authFetch(`${BASE_URL}/api/seller/products/${productId}/`, {
             method: 'PATCH',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
         return handleResponse<ApiProduct>(response);
@@ -395,9 +353,8 @@ export const sellerApi = {
      * Delete a product
      */
     async deleteProduct(productId: number): Promise<void> {
-        const response = await fetch(`${BASE_URL}/api/seller/products/${productId}/`, {
+        const response = await authFetch(`${BASE_URL}/api/seller/products/${productId}/`, {
             method: 'DELETE',
-            headers: getAuthHeaders(),
         });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -411,9 +368,8 @@ export const sellerApi = {
     async getCategories(): Promise<PaginatedResponse<ApiCategory>> {
         // First get seller profile to get store ID, then get categories
         const profile = await authApi.getSellerProfile();
-        const response = await fetch(
-            `${BASE_URL}/api/stores/${profile.store.id}/categories/`,
-            { headers: getAuthHeaders() }
+        const response = await authFetch(
+            `${BASE_URL}/api/stores/${profile.store.id}/categories/`
         );
         return handleResponse(response);
     },
@@ -422,9 +378,7 @@ export const sellerApi = {
      * Get seller's locations
      */
     async getLocations(): Promise<PaginatedResponse<ApiLocation>> {
-        const response = await fetch(`${BASE_URL}/api/seller/locations/`, {
-            headers: getAuthHeaders(),
-        });
+        const response = await authFetch(`${BASE_URL}/api/seller/locations/`);
         return handleResponse(response);
     },
 
@@ -438,9 +392,9 @@ export const sellerApi = {
         longitude?: number;
         is_default?: boolean;
     }): Promise<ApiLocation> {
-        const response = await fetch(`${BASE_URL}/api/seller/locations/`, {
+        const response = await authFetch(`${BASE_URL}/api/seller/locations/`, {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
         return handleResponse<ApiLocation>(response);
@@ -459,9 +413,9 @@ export const sellerApi = {
             is_default: boolean;
         }>
     ): Promise<ApiLocation> {
-        const response = await fetch(`${BASE_URL}/api/seller/locations/${locationId}/`, {
+        const response = await authFetch(`${BASE_URL}/api/seller/locations/${locationId}/`, {
             method: 'PATCH',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
         });
         return handleResponse<ApiLocation>(response);
@@ -471,9 +425,8 @@ export const sellerApi = {
      * Delete seller location
      */
     async deleteLocation(locationId: number): Promise<void> {
-        const response = await fetch(`${BASE_URL}/api/seller/locations/${locationId}/`, {
+        const response = await authFetch(`${BASE_URL}/api/seller/locations/${locationId}/`, {
             method: 'DELETE',
-            headers: getAuthHeaders(),
         });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
