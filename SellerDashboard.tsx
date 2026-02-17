@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import MapLocationPicker from './components/MapLocationPicker';
 import { SellerTabState } from './types';
 import {
     useSellerData,
@@ -7,7 +8,7 @@ import {
     SellerProductUI,
     VALID_UNITS,
 } from './hooks/useSellerData';
-import { ApiCategory, getCustomer, ApiCustomer } from './services/api';
+import { ApiCategory, getCustomer, ApiCustomer, sellerApi, ApiLocation } from './services/api';
 
 // --- Icon Component ---
 const Icon = ({ name, className = "", filled = false }: { name: string, className?: string, filled?: boolean }) => (
@@ -477,6 +478,114 @@ const SellerProfileModal = ({
     </Modal>
 );
 
+// --- Seller Locations Modal ---
+const SellerLocationsModal = ({
+    isOpen,
+    onClose,
+    telegramId
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    telegramId: number;
+}) => {
+    const [locations, setLocations] = useState<ApiLocation[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [showMap, setShowMap] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) fetchLocations();
+    }, [isOpen]);
+
+    const fetchLocations = async () => {
+        setIsLoading(true);
+        try {
+            const locs = await sellerApi.getLocations(telegramId);
+            setLocations(locs);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (!window.confirm("Bu manzilni o'chirmoqchimisiz?")) return;
+        try {
+            await sellerApi.deleteLocation(id, telegramId);
+            setLocations(prev => prev.filter(l => l.id !== id));
+        } catch (err) {
+            console.error(err);
+            alert("O'chirishda xatolik");
+        }
+    };
+
+    if (showMap) {
+        return (
+            <MapLocationPicker
+                onSave={async (data) => {
+                    await sellerApi.createLocation({
+                        telegram_id: telegramId,
+                        name: data.name,
+                        address: data.address,
+                        latitude: data.latitude,
+                        longitude: data.longitude,
+                        is_default: false
+                    });
+                    setShowMap(false);
+                    fetchLocations();
+                }}
+                onCancel={() => setShowMap(false)}
+                saveLabel="Manzilni saqlash"
+            />
+        );
+    }
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Do'kon manzillari">
+            <div className="space-y-4 pt-2">
+                {isLoading ? (
+                    <div className="text-center py-8">
+                        <div className="size-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                    </div>
+                ) : locations.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+                        <Icon name="location_off" className="text-3xl text-gray-400 mb-2" />
+                        <p className="text-gray-500 text-sm">Manzillar yo'q</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {locations.map(loc => (
+                            <div key={loc.id} className="bg-gray-50 dark:bg-gray-800 p-3 rounded-xl flex items-start gap-3 border border-gray-100 dark:border-gray-700">
+                                <div className="size-10 bg-white dark:bg-gray-700 rounded-lg flex items-center justify-center text-primary shrink-0">
+                                    <Icon name="store" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-sm truncate">{loc.name}</p>
+                                    <p className="text-xs text-gray-500 line-clamp-2">{loc.address}</p>
+                                </div>
+                                <button
+                                    onClick={() => handleDelete(loc.id)}
+                                    className="size-8 bg-white dark:bg-gray-700 rounded-lg flex items-center justify-center text-red-400 hover:text-red-500"
+                                >
+                                    <Icon name="delete" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <button
+                    onClick={() => setShowMap(true)}
+                    className="w-full py-3 bg-primary/10 text-primary font-bold rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                >
+                    <Icon name="add_location" />
+                    Yangi manzil qo'shish
+                </button>
+            </div>
+        </Modal>
+    );
+};
+
 // --- Main Seller Dashboard Component ---
 interface SellerDashboardProps {
     telegramId: number;
@@ -512,6 +621,7 @@ export default function SellerDashboard({ telegramId, storeId, storeName, seller
 
     // Modal states
     const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showLocationsModal, setShowLocationsModal] = useState(false);
 
     // Modal states
     const [showProductModal, setShowProductModal] = useState(false);
@@ -545,6 +655,10 @@ export default function SellerDashboard({ telegramId, storeId, storeName, seller
     const handleOpenSettingsItem = (label: string) => {
         if (label === 'Profil sozlamalari') {
             setShowProfileModal(true);
+            return;
+        }
+        if (label === "Do'kon manzili") {
+            setShowLocationsModal(true);
             return;
         }
         setSettingsModalTitle(label);
@@ -983,6 +1097,11 @@ export default function SellerDashboard({ telegramId, storeId, storeName, seller
                 sellerName={sellerName}
                 storeName={storeName}
                 customer={customerProfile}
+            />
+            <SellerLocationsModal
+                isOpen={showLocationsModal}
+                onClose={() => setShowLocationsModal(false)}
+                telegramId={telegramId}
             />
             <ProductModal
                 isOpen={showProductModal}

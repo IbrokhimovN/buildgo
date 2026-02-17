@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import MapLocationPicker from './components/MapLocationPicker';
 import { ViewState } from './types';
 import SellerDashboard from './SellerDashboard';
 import { useStores, useCart, useLocations } from './hooks/useBuyerData';
@@ -874,154 +875,7 @@ const OrderSuccessView = ({ order, onContinue }: { order: ApiOrder; onContinue: 
   </div>
 );
 
-// --- Map Location Picker ---
-const MapLocationPicker = ({
-  onSave,
-  onCancel,
-  telegramId,
-}: {
-  onSave: (loc: ApiLocation) => void;
-  onCancel: () => void;
-  telegramId: number;
-}) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
-  const [lat, setLat] = useState(41.2995);
-  const [lng, setLng] = useState(69.2401);
-  const [address, setAddress] = useState('');
-  const [name, setName] = useState('');
-  const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Reverse geocode
-  const reverseGeocode = async (latitude: number, longitude: number) => {
-    setIsGeocoding(true);
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=uz`
-      );
-      const data = await res.json();
-      if (data.display_name) {
-        setAddress(data.display_name);
-      }
-    } catch {
-      // silent
-    } finally {
-      setIsGeocoding(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
-    // @ts-ignore
-    const L = window.L;
-    if (!L) return;
-
-    const map = L.map(mapRef.current).setView([lat, lng], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(map);
-
-    const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
-    marker.on('dragend', () => {
-      const pos = marker.getLatLng();
-      setLat(pos.lat);
-      setLng(pos.lng);
-      reverseGeocode(pos.lat, pos.lng);
-    });
-
-    map.on('click', (e: any) => {
-      marker.setLatLng(e.latlng);
-      setLat(e.latlng.lat);
-      setLng(e.latlng.lng);
-      reverseGeocode(e.latlng.lat, e.latlng.lng);
-    });
-
-    mapInstanceRef.current = map;
-    markerRef.current = marker;
-    reverseGeocode(lat, lng);
-
-    return () => {
-      map.remove();
-      mapInstanceRef.current = null;
-    };
-  }, []);
-
-  const handleSave = async () => {
-    if (!name.trim()) return;
-    setIsSaving(true);
-    try {
-      const newLoc = await buyerApi.createLocation({
-        telegram_id: telegramId,
-        name: name.trim(),
-        address: address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-        latitude: lat,
-        longitude: lng,
-        is_default: false,
-      });
-      onSave(newLoc);
-    } catch (err) {
-      console.error('Failed to save location:', err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] bg-white dark:bg-background-dark flex flex-col">
-      <header className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 bg-white/90 dark:bg-black/90 backdrop-blur-md">
-        <button onClick={onCancel}>
-          <Icon name="close" className="text-xl" />
-        </button>
-        <h2 className="text-lg font-bold flex-1 text-center pr-6">Xaritadan tanlash</h2>
-      </header>
-
-      <div ref={mapRef} className="flex-1" style={{ minHeight: '300px' }} />
-
-      <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-3">
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Icon name="my_location" className="text-primary text-sm" />
-          {isGeocoding ? (
-            <span className="animate-pulse">Manzil aniqlanmoqda...</span>
-          ) : (
-            <span className="line-clamp-2">{address || 'Xaritadan joyni tanlang'}</span>
-          )}
-        </div>
-
-        <div className="flex items-center rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 h-12 bg-gray-50 dark:bg-gray-800/50">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Manzil nomi (masalan: Uy, Ish)"
-            className="flex-1 bg-transparent border-none focus:ring-0 text-base font-medium px-4"
-          />
-          <Icon name="edit_location" className="pr-3 text-gray-400" />
-        </div>
-
-        <button
-          onClick={handleSave}
-          disabled={!name.trim() || isSaving}
-          className="w-full bg-primary text-white py-3.5 rounded-xl font-bold text-base shadow-lg shadow-primary/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-        >
-          {isSaving ? (
-            <>
-              <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Saqlanmoqda...
-            </>
-          ) : (
-            <>
-              <Icon name="save" className="text-lg" />
-              Manzilni saqlash
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // --- Profile View ---
 const ProfileView = ({ telegramUser }: { telegramUser: TelegramUser }) => {
@@ -1058,8 +912,15 @@ const ProfileView = ({ telegramUser }: { telegramUser: TelegramUser }) => {
   if (profileView === 'add_location') {
     return (
       <MapLocationPicker
-        telegramId={telegramUser.telegram_id}
-        onSave={(loc) => {
+        onSave={async (data) => {
+          await buyerApi.createLocation({
+            telegram_id: telegramUser.telegram_id,
+            name: data.name,
+            address: data.address,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            is_default: false,
+          });
           refetchLocations();
           setProfileView('locations');
         }}
