@@ -114,10 +114,11 @@ export function useSellerData(telegramId: number, storeId: number) {
         setError(null);
 
         try {
-            const [ordersResult, productsResult, categoriesResult] = await Promise.allSettled([
+            const [ordersResult, productsResult, categoriesResult, globalCategoriesResult] = await Promise.allSettled([
                 sellerApi.getOrders(telegramId),
                 sellerApi.getProducts(storeId),
                 sellerApi.getCategories(storeId),
+                sellerApi.getCategories(1), // Fetch global categories from Store 1 (Admin Store)
             ]);
 
             // Handle Orders
@@ -127,8 +128,6 @@ export function useSellerData(telegramId: number, storeId: number) {
                 setOrders(ordersArray.map(mapOrderToUI));
             } else {
                 console.error('Failed to fetch orders:', ordersResult.reason);
-                // We don't set global error here to avoid blocking product management
-                // But if it's a critical auth error, we might want to notify
                 if (ordersResult.reason instanceof ApiError && ordersResult.reason.message === 'Not a seller') {
                     setError("Sotuvchi sifatida tasdiqlanmagan (Orders API)");
                 }
@@ -140,17 +139,27 @@ export function useSellerData(telegramId: number, storeId: number) {
             } else {
                 console.error('Failed to fetch products:', productsResult.reason);
                 const message = productsResult.reason instanceof ApiError ? productsResult.reason.message : "Mahsulotlarni yuklashda xatolik";
-                setError(message); // Products are critical
+                setError(message);
             }
 
-            // Handle Categories
+            // Handle Categories (Merge Store Specific + Global/Store 1)
+            const allCats: ApiCategory[] = [];
+
+            // 1. User's store categories
             if (categoriesResult.status === 'fulfilled') {
-                setCategories(categoriesResult.value.results);
+                allCats.push(...categoriesResult.value.results);
             } else {
-                // Categories are optional/secondary, just log
-                console.error('Failed to fetch categories:', categoriesResult.reason);
-                setCategories([]);
+                console.error('Failed to fetch store categories:', categoriesResult.reason);
             }
+
+            // 2. Global categories (Store 1)
+            if (storeId !== 1 && globalCategoriesResult.status === 'fulfilled') {
+                allCats.push(...globalCategoriesResult.value.results);
+            }
+
+            // Deduplicate by ID
+            const uniqueCats = Array.from(new Map(allCats.map(c => [c.id, c])).values());
+            setCategories(uniqueCats);
 
         } catch (err) {
             console.error('Unexpected error in useSellerData:', err);

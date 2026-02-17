@@ -320,6 +320,21 @@ export const sellerApi = {
     },
 
     /**
+     * Create a new category (requires telegram_id)
+     */
+    async createCategory(data: {
+        telegram_id: number;
+        name: string;
+    }): Promise<ApiCategory> {
+        const response = await fetch(`${BASE_URL}/api/seller/categories/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        return handleResponse<ApiCategory>(response);
+    },
+
+    /**
      * Create a new product (requires telegram_id, store auto-assigned)
      */
     async createProduct(data: {
@@ -328,12 +343,25 @@ export const sellerApi = {
         name: string;
         price: string;
         unit: string;
+        image?: File | null;
         is_available?: boolean;
     }): Promise<ApiProduct> {
+        const formData = new FormData();
+        formData.append('telegram_id', String(data.telegram_id));
+        formData.append('category', String(data.category));
+        formData.append('name', data.name);
+        formData.append('price', data.price);
+        formData.append('unit', data.unit);
+        if (data.is_available !== undefined) {
+            formData.append('is_available', String(data.is_available));
+        }
+        if (data.image) {
+            formData.append('image', data.image);
+        }
+
         const response = await fetch(`${BASE_URL}/api/seller/products/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
+            body: formData,
         });
         return handleResponse<ApiProduct>(response);
     },
@@ -349,13 +377,24 @@ export const sellerApi = {
             name?: string;
             price?: string;
             unit?: string;
+            image?: File | null;
             is_available?: boolean;
         }
     ): Promise<ApiProduct> {
+        const formData = new FormData();
+        formData.append('telegram_id', String(data.telegram_id));
+        if (data.category) formData.append('category', String(data.category));
+        if (data.name) formData.append('name', data.name);
+        if (data.price) formData.append('price', data.price);
+        if (data.unit) formData.append('unit', data.unit);
+        if (data.is_available !== undefined) formData.append('is_available', String(data.is_available));
+        if (data.image) {
+            formData.append('image', data.image);
+        }
+
         const response = await fetch(`${BASE_URL}/api/seller/products/${productId}/`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
+            body: formData,
         });
         return handleResponse<ApiProduct>(response);
     },

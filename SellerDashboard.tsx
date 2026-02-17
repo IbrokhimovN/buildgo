@@ -72,13 +72,15 @@ const ProductModal = ({
     categories,
     onSave,
     onDelete,
+    onAddCategory,
 }: {
     isOpen: boolean,
     onClose: () => void,
     product: SellerProductUI | null,
     categories: ApiCategory[],
-    onSave: (data: { name: string; price: number; unit: string; categoryId: number }) => Promise<void>,
+    onSave: (data: { name: string; price: number; unit: string; categoryId: number; image?: File | null }) => Promise<void>,
     onDelete?: (productId: number) => Promise<void>,
+    onAddCategory?: (name: string) => Promise<ApiCategory>,
 }) => {
     const [name, setName] = useState('');
     const [price, setPrice] = useState('');
@@ -88,6 +90,31 @@ const ProductModal = ({
     const [isDeleting, setIsDeleting] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
 
+    // Image State
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+    // New Category State
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [isAddingCat, setIsAddingCat] = useState(false);
+
+    const handleAddCategory = async () => {
+        if (!newCategoryName.trim() || !onAddCategory) return;
+        setIsAddingCat(true);
+        setSaveError(null);
+        try {
+            const cat = await onAddCategory(newCategoryName);
+            setCategoryId(cat.id);
+            setIsAddingCategory(false);
+            setNewCategoryName('');
+        } catch (err) {
+            setSaveError("Kategoriya yaratishda xatolik");
+        } finally {
+            setIsAddingCat(false);
+        }
+    };
+
     React.useEffect(() => {
         setSaveError(null);
         if (product) {
@@ -95,13 +122,25 @@ const ProductModal = ({
             setPrice(product.price.toString());
             setUnit(product.unit);
             setCategoryId(product.categoryId);
+            setImagePreview(product.image || null);
+            setImageFile(null);
         } else {
             setName('');
             setPrice('');
             setUnit('dona');
             setCategoryId(categories[0]?.id || '');
+            setImagePreview(null);
+            setImageFile(null);
         }
     }, [product, isOpen, categories]);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
+        }
+    };
 
     const handleSave = async () => {
         if (!name || !price || !categoryId) return;
@@ -113,6 +152,7 @@ const ProductModal = ({
                 price: parseFloat(price) || 0,
                 unit,
                 categoryId: categoryId as number,
+                image: imageFile,
             });
             onClose();
         } catch (err) {
@@ -186,20 +226,83 @@ const ProductModal = ({
                 {/* Category Select */}
                 <div className="mb-4">
                     <label className="block text-sm font-bold mb-2">Kategoriya *</label>
-                    <div className="relative">
-                        <select
-                            value={categoryId}
-                            onChange={(e) => setCategoryId(Number(e.target.value))}
-                            className="w-full p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white appearance-none pr-12"
-                        >
-                            <option value="">Kategoriyani tanlang</option>
-                            {categories.map((cat) => (
-                                <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                            <Icon name="unfold_more" className="text-primary" />
+
+                    {!isAddingCategory ? (
+                        <div className="relative">
+                            <select
+                                value={categoryId}
+                                onChange={(e) => {
+                                    if (e.target.value === 'new') {
+                                        setIsAddingCategory(true);
+                                    } else {
+                                        setCategoryId(Number(e.target.value));
+                                    }
+                                }}
+                                className="w-full p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white appearance-none pr-12"
+                            >
+                                <option value="">Kategoriyani tanlang</option>
+                                {categories.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                                {onAddCategory && (
+                                    <option value="new" className="font-bold text-primary">+ Yangi kategoriya qo'shish</option>
+                                )}
+                            </select>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <Icon name="unfold_more" className="text-primary" />
+                            </div>
                         </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                placeholder="Kategoriya nomi"
+                                className="flex-1 p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900"
+                                autoFocus
+                            />
+                            <button
+                                onClick={handleAddCategory}
+                                disabled={isAddingCat || !newCategoryName.trim()}
+                                className="bg-primary text-white p-4 rounded-xl font-bold flex items-center justify-center min-w-[60px]"
+                            >
+                                {isAddingCat ? <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Icon name="check" />}
+                            </button>
+                            <button
+                                onClick={() => setIsAddingCategory(false)}
+                                className="bg-gray-100 dark:bg-gray-800 text-gray-500 p-4 rounded-xl font-bold flex items-center justify-center min-w-[60px]"
+                            >
+                                <Icon name="close" />
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Image Upload */}
+                <div className="mb-4">
+                    <label className="block text-sm font-bold mb-2">Mahsulot rasmi</label>
+                    <div className="flex items-center gap-4">
+                        <div className="size-20 bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden flex items-center justify-center border border-gray-200 dark:border-gray-700 relative">
+                            {imagePreview ? (
+                                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                            ) : (
+                                <Icon name="image" className="text-gray-400 text-2xl" />
+                            )}
+                        </div>
+                        <label className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-3 rounded-xl text-sm font-bold cursor-pointer active:scale-95 transition-transform flex items-center gap-2">
+                            <Icon name="add_photo_alternate" className="text-primary" />
+                            Rasm yuklash
+                            <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                        </label>
+                        {imagePreview && (
+                            <button
+                                onClick={() => { setImageFile(null); setImagePreview(null); }}
+                                className="size-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center"
+                            >
+                                <Icon name="delete" />
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -640,7 +743,7 @@ export default function SellerDashboard({ telegramId, storeId, storeName, seller
         : orders.filter(o => o.status === orderFilter);
 
     // Handlers
-    const handleSaveProduct = async (data: { name: string; price: number; unit: string; categoryId: number }) => {
+    const handleSaveProduct = async (data: { name: string; price: number; unit: string; categoryId: number; image?: File | null }) => {
         if (editingProduct) {
             await updateProduct(editingProduct.id, data);
         } else {
@@ -1110,6 +1213,11 @@ export default function SellerDashboard({ telegramId, storeId, storeName, seller
                 categories={categories}
                 onSave={handleSaveProduct}
                 onDelete={editingProduct ? handleDeleteProduct : undefined}
+                onAddCategory={async (name) => {
+                    const newCat = await sellerApi.createCategory({ telegram_id: telegramId, name });
+                    await refetch();
+                    return newCat;
+                }}
             />
             <NotificationsModal isOpen={showNotificationsModal} onClose={() => setShowNotificationsModal(false)} orders={orders} />
             <OrderDetailsModal
