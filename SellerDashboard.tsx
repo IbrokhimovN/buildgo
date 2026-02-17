@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SellerTabState } from './types';
 import {
     useSellerData,
@@ -7,7 +7,7 @@ import {
     SellerProductUI,
     VALID_UNITS,
 } from './hooks/useSellerData';
-import { ApiCategory } from './services/api';
+import { ApiCategory, getCustomer, ApiCustomer } from './services/api';
 
 // --- Icon Component ---
 const Icon = ({ name, className = "", filled = false }: { name: string, className?: string, filled?: boolean }) => (
@@ -409,6 +409,74 @@ const SellerTabBar = ({ activeTab, setActiveTab }: { activeTab: SellerTabState, 
     );
 };
 
+// --- Seller Profile Modal ---
+const SellerProfileModal = ({
+    isOpen,
+    onClose,
+    sellerName,
+    storeName,
+    customer
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    sellerName: string;
+    storeName: string;
+    customer: ApiCustomer | null;
+}) => (
+    <Modal isOpen={isOpen} onClose={onClose} title="Profil sozlamalari">
+        <div className="space-y-6 pt-2">
+            <div className="flex items-center gap-4">
+                <div className="size-20 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Icon name="storefront" className="text-4xl text-primary" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold">{storeName}</h3>
+                    <p className="text-gray-500">Sotuvchi: {sellerName}</p>
+                </div>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                <p className="text-xs text-gray-500 uppercase font-bold mb-3">Shaxsiy ma'lumotlar</p>
+                {customer ? (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="size-10 bg-white dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-400">
+                                <Icon name="person" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-400">Ism-familiya</p>
+                                <p className="font-medium">{customer.first_name} {customer.last_name}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="size-10 bg-white dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-400">
+                                <Icon name="call" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-400">Telefon raqam</p>
+                                <p className="font-medium">{customer.phone}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="size-10 bg-white dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-400">
+                                <Icon name="badge" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-400">Telegram ID</p>
+                                <p className="font-medium">{customer.telegram_id}</p>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center py-6 text-gray-400">
+                        <p>Ma'lumotlar yuklanmadi</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    </Modal>
+);
+
 // --- Main Seller Dashboard Component ---
 interface SellerDashboardProps {
     telegramId: number;
@@ -435,6 +503,15 @@ export default function SellerDashboard({ telegramId, storeId, storeName, seller
     } = useSellerData(telegramId, storeId);
 
     const [activeTab, setActiveTab] = useState<SellerTabState>('DASHBOARD');
+
+    // Profile Data
+    const [customerProfile, setCustomerProfile] = useState<ApiCustomer | null>(null);
+    useEffect(() => {
+        getCustomer(telegramId).then(setCustomerProfile);
+    }, [telegramId]);
+
+    // Modal states
+    const [showProfileModal, setShowProfileModal] = useState(false);
 
     // Modal states
     const [showProductModal, setShowProductModal] = useState(false);
@@ -466,6 +543,10 @@ export default function SellerDashboard({ telegramId, storeId, storeName, seller
     };
 
     const handleOpenSettingsItem = (label: string) => {
+        if (label === 'Profil sozlamalari') {
+            setShowProfileModal(true);
+            return;
+        }
         setSettingsModalTitle(label);
         setShowSettingsModal(true);
     };
@@ -896,6 +977,13 @@ export default function SellerDashboard({ telegramId, storeId, storeName, seller
             <SellerTabBar activeTab={activeTab} setActiveTab={setActiveTab} />
 
             {/* Modals */}
+            <SellerProfileModal
+                isOpen={showProfileModal}
+                onClose={() => setShowProfileModal(false)}
+                sellerName={sellerName}
+                storeName={storeName}
+                customer={customerProfile}
+            />
             <ProductModal
                 isOpen={showProductModal}
                 onClose={() => { setShowProductModal(false); setEditingProduct(null); }}
