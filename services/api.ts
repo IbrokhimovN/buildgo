@@ -1,22 +1,12 @@
 /**
  * BuildGo API Service
  * Complete API layer for Seller and Buyer apps.
- * All requests use authFetch for automatic JWT handling.
+ * NO authentication — uses telegram_id for identity.
  */
 
-import { authFetch, BASE_URL } from './authClient';
+import { BASE_URL } from './telegram';
 
 // --- Types matching Backend API ---
-
-export interface ApiUser {
-    id: number;
-    telegram_id: number;
-    first_name: string;
-    last_name: string;
-    phone: string;
-    role: 'buyer' | 'seller';
-    created_at: string;
-}
 
 export interface ApiStore {
     id: number;
@@ -50,10 +40,15 @@ export interface ApiLocation {
     id: number;
     name: string;
     address: string;
-    latitude?: number;
-    longitude?: number;
+    latitude?: string;
+    longitude?: string;
+    customer: number | null;
+    customer_name: string | null;
+    store: number | null;
+    store_name: string | null;
     is_default: boolean;
     created_at: string;
+    updated_at: string;
 }
 
 export interface ApiOrderItem {
@@ -67,23 +62,45 @@ export interface ApiOrderItem {
 
 export interface ApiOrder {
     id: number;
-    user: number;
-    user_name: string;
-    user_phone?: string;
+    customer: number;
+    customer_name: string;
     store: number;
     store_name: string;
-    status: 'new' | 'done' | 'cancelled';
+    status: 'new' | 'done';
     items: ApiOrderItem[];
-    location?: ApiLocation;
     created_at: string;
     updated_at: string;
 }
 
+export interface ApiCustomer {
+    id: number;
+    telegram_id: number;
+    first_name: string;
+    last_name: string;
+    phone: string;
+    created_at: string;
+}
+
+export interface ApiSellerStore {
+    id: number;
+    name: string;
+    image: string | null;
+    is_active: boolean;
+    created_at: string;
+}
+
 export interface ApiSeller {
     id: number;
-    user: ApiUser;
-    store: ApiStore;
+    telegram_id: number;
+    name: string;
+    store: ApiSellerStore;
     is_active: boolean;
+    created_at: string;
+}
+
+export interface CheckSellerResponse {
+    is_seller: boolean;
+    seller?: ApiSeller;
 }
 
 export interface PaginatedResponse<T> {
@@ -119,55 +136,50 @@ async function handleResponse<T>(response: Response): Promise<T> {
     return response.json();
 }
 
-// --- Authentication API ---
+// --- Seller Check ---
 
-export const authApi = {
-    /**
-     * Get current user profile
-     */
-    async getMe(): Promise<ApiUser> {
-        const response = await authFetch(`${BASE_URL}/api/me/`);
-        return handleResponse<ApiUser>(response);
-    },
+export async function checkSeller(telegramId: number): Promise<CheckSellerResponse> {
+    const response = await fetch(`${BASE_URL}/api/check-seller/?telegram_id=${telegramId}`);
+    return handleResponse<CheckSellerResponse>(response);
+}
 
-    /**
-     * Get seller profile (requires seller role)
-     */
-    async getSellerProfile(): Promise<ApiSeller> {
-        const response = await authFetch(`${BASE_URL}/api/seller/me/`);
-        return handleResponse<ApiSeller>(response);
-    },
+// --- Customer API ---
 
-    /**
-     * Get seller dashboard data
-     */
-    async getSellerDashboard(): Promise<unknown> {
-        const response = await authFetch(`${BASE_URL}/api/seller/dashboard/`);
-        return handleResponse(response);
-    },
-};
+export async function createOrUpdateCustomer(data: {
+    telegram_id: number;
+    first_name: string;
+    last_name: string;
+    phone: string;
+}): Promise<ApiCustomer> {
+    const response = await fetch(`${BASE_URL}/api/customers/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse<ApiCustomer>(response);
+}
 
 // --- Buyer API ---
 
 export const buyerApi = {
     /**
-     * List all stores
+     * List all stores (public, no identity needed)
      */
     async getStores(page = 1): Promise<PaginatedResponse<ApiStore>> {
-        const response = await authFetch(`${BASE_URL}/api/stores/?page=${page}`);
+        const response = await fetch(`${BASE_URL}/api/stores/?page=${page}`);
         return handleResponse(response);
     },
 
     /**
-     * Get categories for a store
+     * Get categories for a store (public)
      */
     async getStoreCategories(storeId: number): Promise<PaginatedResponse<ApiCategory>> {
-        const response = await authFetch(`${BASE_URL}/api/stores/${storeId}/categories/`);
+        const response = await fetch(`${BASE_URL}/api/stores/${storeId}/categories/`);
         return handleResponse(response);
     },
 
     /**
-     * Get products for a store
+     * Get products for a store (public)
      */
     async getStoreProducts(
         storeId: number,
@@ -176,30 +188,27 @@ export const buyerApi = {
     ): Promise<PaginatedResponse<ApiProduct>> {
         let url = `${BASE_URL}/api/stores/${storeId}/products/?page=${page}`;
         if (categoryId) url += `&category=${categoryId}`;
-        const response = await authFetch(url);
+        const response = await fetch(url);
         return handleResponse(response);
     },
 
     /**
-     * Search products across all stores
+     * Search products across all stores (public)
      */
     async searchProducts(query: string): Promise<PaginatedResponse<ApiProduct>> {
-        const response = await authFetch(`${BASE_URL}/api/search/?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${BASE_URL}/api/search/?q=${encodeURIComponent(query)}`);
         return handleResponse(response);
     },
 
     /**
-     * Create an order
+     * Create an order (requires telegram_id)
      */
     async createOrder(data: {
+        telegram_id: number;
         store: number;
         items: { product: number; quantity: number }[];
-        location?: number;
-        first_name?: string;
-        last_name?: string;
-        phone?: string;
     }): Promise<ApiOrder> {
-        const response = await authFetch(`${BASE_URL}/api/orders/`, {
+        const response = await fetch(`${BASE_URL}/api/orders/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -208,32 +217,25 @@ export const buyerApi = {
     },
 
     /**
-     * Get buyer's order history
+     * Get buyer's saved locations (requires telegram_id)
      */
-    async getOrders(page = 1): Promise<PaginatedResponse<ApiOrder>> {
-        const response = await authFetch(`${BASE_URL}/api/orders/?page=${page}`);
+    async getLocations(telegramId: number): Promise<ApiLocation[]> {
+        const response = await fetch(`${BASE_URL}/api/locations/?telegram_id=${telegramId}`);
         return handleResponse(response);
     },
 
     /**
-     * Get buyer's saved locations
-     */
-    async getLocations(): Promise<PaginatedResponse<ApiLocation>> {
-        const response = await authFetch(`${BASE_URL}/api/locations/`);
-        return handleResponse(response);
-    },
-
-    /**
-     * Create a new location
+     * Create a new location (requires telegram_id)
      */
     async createLocation(data: {
+        telegram_id: number;
         name: string;
-        address: string;
         latitude?: number;
         longitude?: number;
+        address: string;
         is_default?: boolean;
     }): Promise<ApiLocation> {
-        const response = await authFetch(`${BASE_URL}/api/locations/`, {
+        const response = await fetch(`${BASE_URL}/api/locations/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -242,19 +244,20 @@ export const buyerApi = {
     },
 
     /**
-     * Update a location
+     * Update a location (requires telegram_id)
      */
     async updateLocation(
         locationId: number,
-        data: Partial<{
-            name: string;
-            address: string;
-            latitude: number;
-            longitude: number;
-            is_default: boolean;
-        }>
+        data: {
+            telegram_id: number;
+            name?: string;
+            address?: string;
+            latitude?: number;
+            longitude?: number;
+            is_default?: boolean;
+        }
     ): Promise<ApiLocation> {
-        const response = await authFetch(`${BASE_URL}/api/locations/${locationId}/`, {
+        const response = await fetch(`${BASE_URL}/api/locations/${locationId}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -263,12 +266,13 @@ export const buyerApi = {
     },
 
     /**
-     * Delete a location
+     * Delete a location (requires telegram_id)
      */
-    async deleteLocation(locationId: number): Promise<void> {
-        const response = await authFetch(`${BASE_URL}/api/locations/${locationId}/`, {
-            method: 'DELETE',
-        });
+    async deleteLocation(locationId: number, telegramId: number): Promise<void> {
+        const response = await fetch(
+            `${BASE_URL}/api/locations/${locationId}/?telegram_id=${telegramId}`,
+            { method: 'DELETE' }
+        );
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new ApiError(errorData.error || 'Failed to delete', response.status);
@@ -280,47 +284,43 @@ export const buyerApi = {
 
 export const sellerApi = {
     /**
-     * Get seller's orders
+     * Get seller's orders (requires telegram_id)
      */
-    async getOrders(page = 1): Promise<PaginatedResponse<ApiOrder>> {
-        const response = await authFetch(`${BASE_URL}/api/seller/orders/?page=${page}`);
+    async getOrders(telegramId: number): Promise<ApiOrder[]> {
+        const response = await fetch(
+            `${BASE_URL}/api/seller/orders/?telegram_id=${telegramId}`
+        );
         return handleResponse(response);
     },
 
     /**
-     * Update order status
+     * Update order status (requires telegram_id)
      */
     async updateOrderStatus(
         orderId: number,
-        status: 'new' | 'done' | 'cancelled'
+        telegramId: number,
+        status: 'new' | 'done'
     ): Promise<ApiOrder> {
-        const response = await authFetch(`${BASE_URL}/api/seller/orders/${orderId}/`, {
+        const response = await fetch(`${BASE_URL}/api/seller/orders/${orderId}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
+            body: JSON.stringify({ telegram_id: telegramId, status }),
         });
         return handleResponse<ApiOrder>(response);
     },
 
     /**
-     * Get seller's products
-     */
-    async getProducts(page = 1): Promise<PaginatedResponse<ApiProduct>> {
-        const response = await authFetch(`${BASE_URL}/api/seller/products/?page=${page}`);
-        return handleResponse(response);
-    },
-
-    /**
-     * Create a new product
+     * Create a new product (requires telegram_id, store auto-assigned)
      */
     async createProduct(data: {
+        telegram_id: number;
         category: number;
         name: string;
         price: string;
         unit: string;
         is_available?: boolean;
     }): Promise<ApiProduct> {
-        const response = await authFetch(`${BASE_URL}/api/seller/products/`, {
+        const response = await fetch(`${BASE_URL}/api/seller/products/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -329,19 +329,20 @@ export const sellerApi = {
     },
 
     /**
-     * Update a product
+     * Update a product (requires telegram_id)
      */
     async updateProduct(
         productId: number,
-        data: Partial<{
-            category: number;
-            name: string;
-            price: string;
-            unit: string;
-            is_available: boolean;
-        }>
+        data: {
+            telegram_id: number;
+            category?: number;
+            name?: string;
+            price?: string;
+            unit?: string;
+            is_available?: boolean;
+        }
     ): Promise<ApiProduct> {
-        const response = await authFetch(`${BASE_URL}/api/seller/products/${productId}/`, {
+        const response = await fetch(`${BASE_URL}/api/seller/products/${productId}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -350,12 +351,13 @@ export const sellerApi = {
     },
 
     /**
-     * Delete a product
+     * Delete a product (requires telegram_id)
      */
-    async deleteProduct(productId: number): Promise<void> {
-        const response = await authFetch(`${BASE_URL}/api/seller/products/${productId}/`, {
-            method: 'DELETE',
-        });
+    async deleteProduct(productId: number, telegramId: number): Promise<void> {
+        const response = await fetch(
+            `${BASE_URL}/api/seller/products/${productId}/?telegram_id=${telegramId}`,
+            { method: 'DELETE' }
+        );
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new ApiError(errorData.error || 'Failed to delete', response.status);
@@ -363,36 +365,45 @@ export const sellerApi = {
     },
 
     /**
-     * Get seller's store categories
+     * Get categories for a store (public endpoint)
      */
-    async getCategories(): Promise<PaginatedResponse<ApiCategory>> {
-        // First get seller profile to get store ID, then get categories
-        const profile = await authApi.getSellerProfile();
-        const response = await authFetch(
-            `${BASE_URL}/api/stores/${profile.store.id}/categories/`
+    async getCategories(storeId: number): Promise<PaginatedResponse<ApiCategory>> {
+        const response = await fetch(`${BASE_URL}/api/stores/${storeId}/categories/`);
+        return handleResponse(response);
+    },
+
+    /**
+     * Get seller's store products (public endpoint via store)
+     */
+    async getProducts(storeId: number, page = 1): Promise<PaginatedResponse<ApiProduct>> {
+        const response = await fetch(
+            `${BASE_URL}/api/stores/${storeId}/products/?page=${page}`
         );
         return handleResponse(response);
     },
 
     /**
-     * Get seller's locations
+     * Get seller's locations (requires telegram_id)
      */
-    async getLocations(): Promise<PaginatedResponse<ApiLocation>> {
-        const response = await authFetch(`${BASE_URL}/api/seller/locations/`);
+    async getLocations(telegramId: number): Promise<ApiLocation[]> {
+        const response = await fetch(
+            `${BASE_URL}/api/seller/locations/?telegram_id=${telegramId}`
+        );
         return handleResponse(response);
     },
 
     /**
-     * Create seller location
+     * Create seller location (requires telegram_id)
      */
     async createLocation(data: {
+        telegram_id: number;
         name: string;
-        address: string;
         latitude?: number;
         longitude?: number;
+        address: string;
         is_default?: boolean;
     }): Promise<ApiLocation> {
-        const response = await authFetch(`${BASE_URL}/api/seller/locations/`, {
+        const response = await fetch(`${BASE_URL}/api/seller/locations/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -401,19 +412,20 @@ export const sellerApi = {
     },
 
     /**
-     * Update seller location
+     * Update seller location (requires telegram_id)
      */
     async updateLocation(
         locationId: number,
-        data: Partial<{
-            name: string;
-            address: string;
-            latitude: number;
-            longitude: number;
-            is_default: boolean;
-        }>
+        data: {
+            telegram_id: number;
+            name?: string;
+            address?: string;
+            latitude?: number;
+            longitude?: number;
+            is_default?: boolean;
+        }
     ): Promise<ApiLocation> {
-        const response = await authFetch(`${BASE_URL}/api/seller/locations/${locationId}/`, {
+        const response = await fetch(`${BASE_URL}/api/seller/locations/${locationId}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -422,12 +434,13 @@ export const sellerApi = {
     },
 
     /**
-     * Delete seller location
+     * Delete seller location (requires telegram_id)
      */
-    async deleteLocation(locationId: number): Promise<void> {
-        const response = await authFetch(`${BASE_URL}/api/seller/locations/${locationId}/`, {
-            method: 'DELETE',
-        });
+    async deleteLocation(locationId: number, telegramId: number): Promise<void> {
+        const response = await fetch(
+            `${BASE_URL}/api/seller/locations/${locationId}/?telegram_id=${telegramId}`,
+            { method: 'DELETE' }
+        );
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new ApiError(errorData.error || 'Failed to delete', response.status);

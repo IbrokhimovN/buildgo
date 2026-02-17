@@ -252,10 +252,9 @@ const ProductModal = ({
 const NotificationsModal = ({ isOpen, onClose, orders }: { isOpen: boolean, onClose: () => void, orders: SellerOrderUI[] }) => {
     // Derive notifications from real orders
     const notifications = orders.slice(0, 5).map(order => {
-        const statusText = {
+        const statusText: Record<string, string> = {
             KUTILMOQDA: 'Yangi buyurtma',
             YETKAZILDI: 'Buyurtma yetkazildi',
-            BEKOR_QILINDI: 'Buyurtma bekor qilindi',
         };
         return {
             title: statusText[order.status] || 'Buyurtma',
@@ -324,7 +323,7 @@ const OrderDetailsModal = ({
                     </div>
                     <div>
                         <p className="font-bold text-lg">{order.customerName}</p>
-                        <p className="text-gray-500 text-sm">{order.customerPhone || 'Xaridor'}</p>
+                        <p className="text-gray-500 text-sm">Xaridor</p>
                     </div>
                 </div>
 
@@ -347,7 +346,7 @@ const OrderDetailsModal = ({
                 <div>
                     <p className="text-sm font-medium mb-2">Statusni o'zgartirish</p>
                     <div className="flex gap-2">
-                        {(['KUTILMOQDA', 'YETKAZILDI', 'BEKOR_QILINDI'] as UIOrderStatus[]).map((status) => (
+                        {(['KUTILMOQDA', 'YETKAZILDI'] as UIOrderStatus[]).map((status) => (
                             <button
                                 key={status}
                                 onClick={() => handleStatusChange(status)}
@@ -363,20 +362,10 @@ const OrderDetailsModal = ({
                     </div>
                 </div>
 
-                {order.customerPhone ? (
-                    <a
-                        href={`tel:${order.customerPhone}`}
-                        className="w-full bg-primary/10 text-primary py-4 rounded-xl font-bold flex items-center justify-center gap-2"
-                    >
-                        <Icon name="call" />
-                        Xaridorga qo'ng'iroq qilish
-                    </a>
-                ) : (
-                    <div className="w-full bg-gray-100 dark:bg-gray-800 text-gray-400 py-4 rounded-xl font-bold flex items-center justify-center gap-2">
-                        <Icon name="call" />
-                        Telefon raqam mavjud emas
-                    </div>
-                )}
+                <div className="w-full bg-gray-100 dark:bg-gray-800 text-gray-400 py-4 rounded-xl font-bold flex items-center justify-center gap-2">
+                    <Icon name="info" />
+                    Xaridor ma'lumotlari buyurtmada
+                </div>
             </div>
         </Modal>
     );
@@ -421,9 +410,15 @@ const SellerTabBar = ({ activeTab, setActiveTab }: { activeTab: SellerTabState, 
 };
 
 // --- Main Seller Dashboard Component ---
-export default function SellerDashboard({ onBack }: { onBack: () => void }) {
+interface SellerDashboardProps {
+    telegramId: number;
+    storeId: number;
+    storeName: string;
+    sellerName: string;
+}
+
+export default function SellerDashboard({ telegramId, storeId, storeName, sellerName }: SellerDashboardProps) {
     const {
-        profile,
         orders,
         products,
         categories,
@@ -437,7 +432,7 @@ export default function SellerDashboard({ onBack }: { onBack: () => void }) {
         deleteProduct,
         newOrdersCount,
         totalRevenue,
-    } = useSellerData();
+    } = useSellerData(telegramId, storeId);
 
     const [activeTab, setActiveTab] = useState<SellerTabState>('DASHBOARD');
 
@@ -754,7 +749,6 @@ export default function SellerDashboard({ onBack }: { onBack: () => void }) {
             { id: 'all', label: 'Barchasi' },
             { id: 'KUTILMOQDA', label: 'Kutilmoqda' },
             { id: 'YETKAZILDI', label: 'Yetkazildi' },
-            { id: 'BEKOR_QILINDI', label: 'Bekor' },
         ];
 
         return (
@@ -827,7 +821,7 @@ export default function SellerDashboard({ onBack }: { onBack: () => void }) {
                             <Icon name="storefront" className="text-primary text-2xl" />
                         </div>
                         <div>
-                            <p className="font-bold text-lg">{profile?.store.name || "Mening Do'konim"}</p>
+                            <p className="font-bold text-lg">{storeName || "Mening Do'konim"}</p>
                             <p className="text-gray-500 text-sm">Sotuvchi akkaunt</p>
                         </div>
                     </div>
@@ -855,14 +849,10 @@ export default function SellerDashboard({ onBack }: { onBack: () => void }) {
                     ))}
                 </div>
 
-                {/* Exit to Buyer App */}
-                <button
-                    onClick={onBack}
-                    className="w-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-bold py-4 rounded-xl flex items-center justify-center gap-2 mt-4 active:scale-95 transition-transform"
-                >
-                    <Icon name="logout" />
-                    Xaridor ilovasiga o'tish
-                </button>
+                {/* Info about seller */}
+                <div className="w-full bg-gray-50 dark:bg-gray-800 text-gray-500 py-4 rounded-xl text-center text-sm mt-4">
+                    Sotuvchi: {sellerName}
+                </div>
             </div>
         </div>
     );
@@ -888,7 +878,7 @@ export default function SellerDashboard({ onBack }: { onBack: () => void }) {
                 <header className="sticky top-0 z-50 bg-white/90 dark:bg-background-dark/90 backdrop-blur-md p-4 pt-6">
                     <div className="flex items-center justify-between mb-2">
                         <div>
-                            <h1 className="text-2xl font-bold">{profile?.store.name || "Mening Do'konim"}</h1>
+                            <h1 className="text-2xl font-bold">{storeName || "Mening Do'konim"}</h1>
                             <p className="text-gray-500 text-sm">Sotuvchi paneli</p>
                         </div>
                         <button

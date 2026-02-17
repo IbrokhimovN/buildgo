@@ -1,33 +1,22 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ViewState } from './types';
 import SellerDashboard from './SellerDashboard';
-import { useStores, useCart, useOrderHistory, useLocations } from './hooks/useBuyerData';
+import { useStores, useCart, useLocations } from './hooks/useBuyerData';
 import {
   buyerApi,
+  checkSeller,
+  createOrUpdateCustomer,
   ApiStore,
   ApiProduct,
   ApiCategory,
   ApiOrder,
   ApiLocation,
+  ApiSeller,
   ApiError,
 } from './services/api';
-import { useAuth, AuthUser } from './context/AuthContext';
+import { getTelegramUser, TelegramUser } from './services/telegram';
 
-
-function getRequestedMode(): string | null {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('mode');
-}
-
-function getInitialView(userRole?: string): ViewState {
-  const mode = getRequestedMode();
-
-  if (mode === 'seller' && userRole === 'seller') {
-    return 'SELLER';
-  }
-
-  return 'HOME';
-}
+type AppMode = 'customer' | 'seller' | 'loading' | 'no_telegram' | 'error';
 
 // --- Types ---
 interface CartItem {
@@ -648,32 +637,24 @@ const CartView = ({
 
 const CheckoutView = ({
   cartItems,
+  telegramUser,
   onConfirm,
   onBack,
 }: {
   cartItems: CartItem[];
+  telegramUser: TelegramUser;
   onConfirm: (data: { firstName: string; lastName: string; phone: string; address: string; locationId?: number }) => Promise<void>;
   onBack: () => void;
 }) => {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [firstName, setFirstName] = useState(telegramUser.first_name || "");
+  const [lastName, setLastName] = useState(telegramUser.last_name || "");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [useManualAddress, setUseManualAddress] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { locations, isLoading: isLoadingLocations } = useLocations();
-
-  // Pre-fill from auth user
-  const { user: authUser } = useAuth();
-  useEffect(() => {
-    if (authUser) {
-      if (authUser.first_name && !firstName) setFirstName(authUser.first_name);
-      if (authUser.last_name && !lastName) setLastName(authUser.last_name);
-      if (authUser.phone && !phone) setPhone(authUser.phone);
-    }
-  }, [authUser]);
+  const { locations, isLoading: isLoadingLocations } = useLocations(telegramUser.telegram_id);
 
   // Auto-select default location
   useEffect(() => {
@@ -891,85 +872,10 @@ const OrderSuccessView = ({ order, onContinue }: { order: ApiOrder; onContinue: 
   </div>
 );
 
-// --- Order History View ---
-const OrdersHistoryView = ({ onBack }: { onBack: () => void }) => {
-  const { orders, isLoading, error, refetch } = useOrderHistory();
-
-  const statusColors: Record<string, string> = {
-    new: 'text-yellow-600 bg-yellow-50',
-    done: 'text-green-600 bg-green-50',
-    cancelled: 'text-red-600 bg-red-50',
-  };
-  const statusLabels: Record<string, string> = {
-    new: 'Kutilmoqda',
-    done: 'Yetkazildi',
-    cancelled: 'Bekor qilindi',
-  };
-
-  return (
-    <div className="pb-32">
-      <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 p-4 flex items-center justify-between">
-        <button onClick={onBack}><Icon name="arrow_back_ios" /></button>
-        <h2 className="text-lg font-bold">Buyurtmalar tarixi</h2>
-        <div className="w-8" />
-      </header>
-
-      {isLoading && <LoadingSpinner message="Buyurtmalar yuklanmoqda..." />}
-
-      {error && <ErrorMessage message={error} onRetry={refetch} />}
-
-      {!isLoading && !error && orders.length === 0 && (
-        <div className="text-center py-20">
-          <Icon name="receipt_long" className="text-4xl text-gray-300 mb-4" />
-          <p className="text-gray-500">Hali buyurtmalar yo'q</p>
-        </div>
-      )}
-
-      {!isLoading && !error && orders.length > 0 && (
-        <div className="px-4 mt-4 space-y-3">
-          {orders.map(order => (
-            <div key={order.id} className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <p className="font-bold">Buyurtma #{order.id}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{order.store_name}</p>
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded ${statusColors[order.status] || ''}`}>
-                  {statusLabels[order.status] || order.status}
-                </span>
-              </div>
-              <div className="space-y-1">
-                {order.items.map(item => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">{item.product_name} × {item.quantity}</span>
-                    <span className="font-medium">{(parseFloat(item.price_at_order) * item.quantity).toLocaleString()} so'm</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-                <span className="text-xs text-gray-400">
-                  {new Date(order.created_at).toLocaleDateString('uz-UZ')}
-                </span>
-                <span className="font-bold text-primary">
-                  {order.items.reduce((s, i) => s + parseFloat(i.price_at_order) * i.quantity, 0).toLocaleString()} so'm
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // --- Profile View ---
-const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
-  const { user, logout } = useAuth();
-
-  const roleLabels: Record<string, string> = {
-    buyer: 'Xaridor',
-    seller: 'Sotuvchi',
-  };
+const ProfileView = ({ telegramUser }: { telegramUser: TelegramUser }) => {
+  // @ts-ignore
+  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
 
   return (
     <div className="pb-32">
@@ -985,31 +891,16 @@ const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
           </div>
           <div>
             <p className="font-bold text-lg">
-              {user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'Foydalanuvchi'}
+              {`${telegramUser.first_name || ''} ${telegramUser.last_name || ''}`.trim() || 'Foydalanuvchi'}
             </p>
             <p className="text-gray-500 text-sm">
-              {user?.phone || 'Telegram orqali'}
+              {tgUser?.username ? `@${tgUser.username}` : 'Telegram orqali'}
             </p>
-            {user?.role && (
-              <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded">
-                {roleLabels[user.role] || user.role}
-              </span>
-            )}
           </div>
         </div>
 
         {/* Menu Items */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
-          <button
-            onClick={onViewOrders}
-            className="w-full p-4 flex items-center gap-4 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
-          >
-            <div className="size-10 bg-primary/10 rounded-xl flex items-center justify-center">
-              <Icon name="receipt_long" className="text-primary" />
-            </div>
-            <span className="flex-1 text-left font-medium">Buyurtmalar tarixi</span>
-            <Icon name="chevron_right" className="text-gray-400" />
-          </button>
           <button className="w-full p-4 flex items-center gap-4 active:bg-gray-50 dark:active:bg-gray-800 transition-colors">
             <div className="size-10 bg-blue-50 rounded-xl flex items-center justify-center">
               <Icon name="location_on" className="text-blue-500" />
@@ -1025,15 +916,6 @@ const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
             <Icon name="chevron_right" className="text-gray-400" />
           </button>
         </div>
-
-        {/* Logout Button */}
-        <button
-          onClick={logout}
-          className="w-full mt-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold py-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
-        >
-          <Icon name="logout" />
-          Chiqish
-        </button>
       </div>
     </div>
   );
@@ -1042,10 +924,12 @@ const ProfileView = ({ onViewOrders }: { onViewOrders: () => void }) => {
 // --- Main App ---
 
 export default function App() {
-  const { user, isAuthenticated, isLoading: isAuthLoading, error: authError, login } = useAuth();
+  const [appMode, setAppMode] = useState<AppMode>('loading');
+  const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null);
+  const [sellerData, setSellerData] = useState<ApiSeller | null>(null);
+  const [bootError, setBootError] = useState<string | null>(null);
 
   const [view, setView] = useState<ViewState>('HOME');
-  const [sellerAccessDenied, setSellerAccessDenied] = useState(false);
 
   // Data from hooks — MUST be called before any early returns (Rules of Hooks)
   const { stores, isLoading: isLoadingStores, error: storesError, refetch: fetchStores } = useStores();
@@ -1066,19 +950,72 @@ export default function App() {
   const [lastOrder, setLastOrder] = useState<ApiOrder | null>(null);
   const [previousView, setPreviousView] = useState<ViewState>('HOME');
 
-  // Once auth completes, determine initial view based on user role
+  // --- BOOTSTRAP: Read Telegram user, check seller status ---
   useEffect(() => {
-    if (!isAuthLoading && isAuthenticated && user) {
-      const mode = getRequestedMode();
-      if (mode === 'seller') {
-        if (user.role === 'seller') {
-          setView('SELLER');
-        } else {
-          setSellerAccessDenied(true);
+    const bootstrap = async () => {
+      // 1. Read Telegram user
+      const tgUser = getTelegramUser();
+      if (!tgUser) {
+        // Not in Telegram — dev mode fallback
+        const devUser: TelegramUser = {
+          telegram_id: 123456789,
+          first_name: 'Dev',
+          last_name: 'User',
+        };
+        setTelegramUser(devUser);
+
+        // Check for ?mode=seller in URL for dev testing
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'seller') {
+          // Try to check seller from backend, fallback to mock
+          try {
+            const result = await checkSeller(devUser.telegram_id);
+            if (result.is_seller && result.seller) {
+              setSellerData(result.seller);
+              setAppMode('seller');
+              console.warn('Dev mode — seller from backend');
+              return;
+            }
+          } catch {
+            // Backend not available, use mock
+          }
+          // Mock seller data for dev
+          setSellerData({
+            id: 1,
+            name: 'Dev Seller',
+            telegram_id: devUser.telegram_id,
+            store: { id: 1, name: 'Dev Do\'kon', is_active: true },
+          } as ApiSeller);
+          setAppMode('seller');
+          console.warn('Dev mode — seller (mock)');
+          return;
         }
+
+        setAppMode('customer');
+        console.warn('No Telegram context — running in dev mode as customer');
+        return;
       }
-    }
-  }, [isAuthLoading, isAuthenticated, user]);
+
+      setTelegramUser(tgUser);
+
+      // 2. Check seller status
+      try {
+        const result = await checkSeller(tgUser.telegram_id);
+        if (result.is_seller && result.seller) {
+          setSellerData(result.seller);
+          setAppMode('seller');
+        } else {
+          setAppMode('customer');
+        }
+      } catch (err) {
+        console.error('Bootstrap failed:', err);
+        setBootError('Tarmoq xatoligi. Qayta urinib ko\'ring.');
+        setAppMode('error');
+      }
+    };
+
+    bootstrap();
+  }, []);
 
   // Wrapper around addItem that handles multi-store conflicts with a confirm dialog
   const addToCart = (product: ApiProduct, quantity: number) => {
@@ -1094,23 +1031,28 @@ export default function App() {
     }
   };
 
-  // Listen for URL changes (popstate)
-  useEffect(() => {
-    const handlePopState = () => {
-      setView(getInitialView(user?.role));
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [user]);
-
-  // Order submission — throws on failure so CheckoutView can display errors
+  // Order submission
   const handleCheckout = async (data: { firstName: string; lastName: string; phone: string; address: string; locationId?: number }) => {
-    let locationId = data.locationId;
+    if (!telegramUser) throw new Error('Telegram user topilmadi');
 
-    // If no saved location selected, create one
+    // Create/update customer profile first
+    try {
+      await createOrUpdateCustomer({
+        telegram_id: telegramUser.telegram_id,
+        first_name: data.firstName,
+        last_name: data.lastName,
+        phone: data.phone,
+      });
+    } catch {
+      // Customer creation may fail if already exists, continue
+    }
+
+    // Create location if manual address
+    let locationId = data.locationId;
     if (!locationId && data.address) {
       try {
         const location = await buyerApi.createLocation({
+          telegram_id: telegramUser.telegram_id,
           name: `${data.firstName} ${data.lastName}`,
           address: data.address,
           is_default: true,
@@ -1121,78 +1063,79 @@ export default function App() {
       }
     }
 
-    const order = await submitOrder(locationId, {
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone,
-    });
+    const order = await submitOrder(telegramUser.telegram_id, locationId);
     setLastOrder(order);
     setView('ORDER_SUCCESS');
   };
 
+  // --- RENDER ---
 
+  // Loading screen
+  if (appMode === 'loading') {
+    return (
+      <div className="max-w-lg mx-auto bg-background-light dark:bg-background-dark min-h-screen flex items-center justify-center font-sans text-gray-900 dark:text-white">
+        <div className="text-center">
+          <div className="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500">Yuklanmoqda...</p>
+        </div>
+      </div>
+    );
+  }
 
+  // No Telegram context screen
+  if (appMode === 'no_telegram') {
+    return (
+      <div className="max-w-lg mx-auto bg-background-light dark:bg-background-dark min-h-screen flex items-center justify-center p-6 font-sans text-gray-900 dark:text-white">
+        <div className="text-center">
+          <div className="size-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Icon name="telegram" className="text-3xl text-blue-500" />
+          </div>
+          <h2 className="text-lg font-bold mb-2">Telegram orqali oching</h2>
+          <p className="text-gray-500">
+            Bu ilova faqat Telegram orqali ishlaydi. Iltimos, ilovani Telegram botdan oching.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Network error screen
+  if (appMode === 'error') {
+    return (
+      <div className="max-w-lg mx-auto bg-background-light dark:bg-background-dark min-h-screen flex items-center justify-center p-6 font-sans text-gray-900 dark:text-white">
+        <div className="text-center">
+          <div className="size-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Icon name="wifi_off" className="text-3xl text-red-500" />
+          </div>
+          <h2 className="text-lg font-bold mb-2">Tarmoq xatoligi</h2>
+          <p className="text-gray-500 mb-6">{bootError || 'Serverga ulanib bo\'lmadi'}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-primary text-white px-8 py-3 rounded-xl font-bold"
+          >
+            Qayta urinish
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- SELLER MODE ---
+  if (appMode === 'seller' && sellerData && telegramUser) {
+    return (
+      <div className="max-w-lg mx-auto bg-background-light dark:bg-background-dark min-h-screen relative font-sans text-gray-900 dark:text-white overflow-x-hidden">
+        <SellerDashboard
+          telegramId={telegramUser.telegram_id}
+          storeId={sellerData.store.id}
+          storeName={sellerData.store.name}
+          sellerName={sellerData.name}
+        />
+      </div>
+    );
+  }
+
+  // --- CUSTOMER MODE ---
   const renderContent = () => {
-    // Auth loading screen
-    if (isAuthLoading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-500">Avtorizatsiya...</p>
-          </div>
-        </div>
-      );
-    }
-
-    // Auth error screen
-    if (authError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-6">
-          <div className="text-center">
-            <div className="size-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Icon name="error" className="text-3xl text-red-500" />
-            </div>
-            <h2 className="text-lg font-bold mb-2">Avtorizatsiya xatoligi</h2>
-            <p className="text-gray-500 mb-6">{authError}</p>
-            <button
-              onClick={login}
-              className="bg-primary text-white px-8 py-3 rounded-xl font-bold"
-            >
-              Qayta urinish
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    // Seller access denied screen
-    if (sellerAccessDenied) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-6">
-          <div className="text-center">
-            <div className="size-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Icon name="block" className="text-3xl text-yellow-600" />
-            </div>
-            <h2 className="text-lg font-bold mb-2">Kirish taqiqlangan</h2>
-            <p className="text-gray-500 mb-6">
-              Sotuvchi paneliga kirish uchun sizda ruxsat yo'q. Faqat sotuvchi rolga ega foydalanuvchilar kirishi mumkin.
-            </p>
-            <button
-              onClick={() => {
-                setSellerAccessDenied(false);
-                window.history.pushState({}, '', '/');
-                setView('HOME');
-              }}
-              className="bg-primary text-white px-8 py-3 rounded-xl font-bold"
-            >
-              Bosh sahifaga qaytish
-            </button>
-          </div>
-        </div>
-      );
-    }
-
     switch (view) {
       case 'HOME':
         return (
@@ -1247,33 +1190,19 @@ export default function App() {
             onContinue={() => { setLastOrder(null); setView('HOME'); }}
           />
         ) : null;
-      case 'ORDERS':
-        return (
-          <OrdersHistoryView onBack={() => setView('HOME')} />
-        );
-      case 'SELLER':
-        return (
-          <SellerDashboard
-            onBack={() => {
-              window.history.pushState({}, '', '/');
-              setView('HOME');
-            }}
-          />
-        );
       case 'CHECKOUT':
-        return (
+        return telegramUser ? (
           <CheckoutView
             cartItems={cart}
+            telegramUser={telegramUser}
             onConfirm={handleCheckout}
             onBack={() => setView('CART')}
           />
-        );
+        ) : null;
       case 'PROFILE':
-        return (
-          <ProfileView
-            onViewOrders={() => setView('ORDERS')}
-          />
-        );
+        return telegramUser ? (
+          <ProfileView telegramUser={telegramUser} />
+        ) : null;
       default:
         return (
           <HomeView
@@ -1288,16 +1217,13 @@ export default function App() {
     }
   };
 
-  const showTabBar = !isAuthLoading && !authError && !sellerAccessDenied &&
-    view !== 'CHECKOUT' && view !== 'SELLER' && view !== 'ORDER_SUCCESS';
-
   return (
     <div className="max-w-lg mx-auto bg-background-light dark:bg-background-dark min-h-screen relative font-sans text-gray-900 dark:text-white overflow-x-hidden">
       {renderContent()}
 
-      {showTabBar && (
+      {view !== 'CHECKOUT' && view !== 'SELLER' && view !== 'ORDER_SUCCESS' && (
         <TabBar
-          currentView={view === 'ORDERS' ? 'PROFILE' as ViewState : view}
+          currentView={view}
           setView={setView}
           cartItemCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
         />
@@ -1305,4 +1231,3 @@ export default function App() {
     </div>
   );
 }
-

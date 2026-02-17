@@ -1,5 +1,6 @@
 /**
- * useBuyerData - Custom hook for Buyer App data fetching
+ * useBuyerData - Custom hooks for Buyer App data fetching
+ * Uses telegram_id for identity — no auth tokens.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -13,7 +14,7 @@ import {
     ApiError,
 } from '../services/api';
 
-// --- Stores Hook ---
+// --- Stores Hook (public, no identity needed) ---
 export function useStores() {
     const [stores, setStores] = useState<ApiStore[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -41,7 +42,7 @@ export function useStores() {
     return { stores, isLoading, error, refetch: fetchStores };
 }
 
-// --- Store Products Hook ---
+// --- Store Products Hook (public) ---
 export function useStoreProducts(storeId: number | null) {
     const [products, setProducts] = useState<ApiProduct[]>([]);
     const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -93,7 +94,7 @@ export function useStoreProducts(storeId: number | null) {
     };
 }
 
-// --- Search Products Hook ---
+// --- Search Products Hook (public) ---
 export function useProductSearch() {
     const [results, setResults] = useState<ApiProduct[]>([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -188,10 +189,13 @@ export function useCart() {
         );
     }, [items]);
 
+    /**
+     * Submit order with telegram_id
+     */
     const submitOrder = useCallback(
         async (
+            telegramId: number,
             locationId?: number,
-            customerInfo?: { firstName: string; lastName: string; phone: string }
         ): Promise<ApiOrder> => {
             if (items.length === 0) {
                 throw new Error('Savat bo\'sh');
@@ -209,15 +213,12 @@ export function useCart() {
 
             try {
                 const order = await buyerApi.createOrder({
+                    telegram_id: telegramId,
                     store: storeId,
                     items: items.map((item) => ({
                         product: item.product.id,
                         quantity: item.quantity,
                     })),
-                    location: locationId,
-                    first_name: customerInfo?.firstName,
-                    last_name: customerInfo?.lastName,
-                    phone: customerInfo?.phone,
                 });
                 clearCart();
                 return order;
@@ -248,47 +249,19 @@ export function useCart() {
     };
 }
 
-// --- Order History Hook ---
-export function useOrderHistory() {
-    const [orders, setOrders] = useState<ApiOrder[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const fetchOrders = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await buyerApi.getOrders();
-            setOrders(response.results);
-        } catch (err) {
-            const message =
-                err instanceof ApiError ? err.message : 'Buyurtmalarni yuklashda xatolik';
-            setError(message);
-            console.error('Failed to fetch orders:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchOrders();
-    }, [fetchOrders]);
-
-    return { orders, isLoading, error, refetch: fetchOrders };
-}
-
-// --- Locations Hook ---
-export function useLocations() {
+// --- Locations Hook (requires telegram_id) ---
+export function useLocations(telegramId: number | null) {
     const [locations, setLocations] = useState<ApiLocation[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const fetchLocations = useCallback(async () => {
+        if (!telegramId) return;
         setIsLoading(true);
         setError(null);
         try {
-            const response = await buyerApi.getLocations();
-            setLocations(response.results);
+            const data = await buyerApi.getLocations(telegramId);
+            setLocations(Array.isArray(data) ? data : []);
         } catch (err) {
             const message =
                 err instanceof ApiError ? err.message : 'Manzillarni yuklashda xatolik';
@@ -297,12 +270,16 @@ export function useLocations() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [telegramId]);
 
     const addLocation = useCallback(
         async (data: { name: string; address: string; is_default?: boolean }) => {
+            if (!telegramId) throw new Error('telegram_id is required');
             try {
-                const newLocation = await buyerApi.createLocation(data);
+                const newLocation = await buyerApi.createLocation({
+                    telegram_id: telegramId,
+                    ...data,
+                });
                 setLocations((prev) => [...prev, newLocation]);
                 return newLocation;
             } catch (err) {
@@ -312,12 +289,13 @@ export function useLocations() {
                 throw err;
             }
         },
-        []
+        [telegramId]
     );
 
     const deleteLocation = useCallback(async (locationId: number) => {
+        if (!telegramId) throw new Error('telegram_id is required');
         try {
-            await buyerApi.deleteLocation(locationId);
+            await buyerApi.deleteLocation(locationId, telegramId);
             setLocations((prev) => prev.filter((loc) => loc.id !== locationId));
         } catch (err) {
             const message =
@@ -325,11 +303,13 @@ export function useLocations() {
             setError(message);
             throw err;
         }
-    }, []);
+    }, [telegramId]);
 
     useEffect(() => {
-        fetchLocations();
-    }, [fetchLocations]);
+        if (telegramId) {
+            fetchLocations();
+        }
+    }, [telegramId, fetchLocations]);
 
     return {
         locations,

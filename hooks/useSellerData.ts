@@ -1,32 +1,29 @@
 /**
  * useSellerData - Custom hook for Seller Dashboard data fetching
+ * Uses telegram_id for identity — no auth tokens.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import {
     sellerApi,
-    authApi,
     ApiProduct,
     ApiCategory,
     ApiOrder,
-    ApiSeller,
     ApiError,
 } from '../services/api';
 
 // --- Order Status Mapping ---
-export type UIOrderStatus = 'KUTILMOQDA' | 'YETKAZILDI' | 'BEKOR_QILINDI';
-export type ApiOrderStatus = 'new' | 'done' | 'cancelled';
+export type UIOrderStatus = 'KUTILMOQDA' | 'YETKAZILDI';
+export type ApiOrderStatus = 'new' | 'done';
 
 export const statusToApi: Record<UIOrderStatus, ApiOrderStatus> = {
     KUTILMOQDA: 'new',
     YETKAZILDI: 'done',
-    BEKOR_QILINDI: 'cancelled',
 };
 
 export const statusToUI: Record<ApiOrderStatus, UIOrderStatus> = {
     new: 'KUTILMOQDA',
     done: 'YETKAZILDI',
-    cancelled: 'BEKOR_QILINDI',
 };
 
 // --- UI Types ---
@@ -34,7 +31,6 @@ export interface SellerOrderUI {
     id: number;
     customerName: string;
     customerInitials: string;
-    customerPhone?: string;
     productSummary: string;
     quantitySummary: string;
     totalPrice: number;
@@ -79,9 +75,8 @@ function mapOrderToUI(order: ApiOrder): SellerOrderUI {
 
     return {
         id: order.id,
-        customerName: order.user_name,
-        customerInitials: getInitials(order.user_name),
-        customerPhone: order.user_phone,
+        customerName: order.customer_name,
+        customerInitials: getInitials(order.customer_name),
         productSummary,
         quantitySummary,
         totalPrice,
@@ -106,8 +101,7 @@ function mapProductToUI(product: ApiProduct): SellerProductUI {
 }
 
 // --- Main Hook ---
-export function useSellerData() {
-    const [profile, setProfile] = useState<ApiSeller | null>(null);
+export function useSellerData(telegramId: number, storeId: number) {
     const [orders, setOrders] = useState<SellerOrderUI[]>([]);
     const [products, setProducts] = useState<SellerProductUI[]>([]);
     const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -121,20 +115,14 @@ export function useSellerData() {
 
         try {
             const [ordersRes, productsRes, categoriesRes] = await Promise.all([
-                sellerApi.getOrders(),
-                sellerApi.getProducts(),
-                sellerApi.getCategories().catch(() => ({ results: [] as ApiCategory[] })),
+                sellerApi.getOrders(telegramId),
+                sellerApi.getProducts(storeId),
+                sellerApi.getCategories(storeId).catch(() => ({ results: [] as ApiCategory[] })),
             ]);
 
-            // Try to get profile
-            try {
-                const profileData = await authApi.getSellerProfile();
-                setProfile(profileData);
-            } catch {
-                // Profile may fail if not authenticated yet
-            }
-
-            setOrders(ordersRes.results.map(mapOrderToUI));
+            // Orders come as array (not paginated)
+            const ordersArray = Array.isArray(ordersRes) ? ordersRes : [];
+            setOrders(ordersArray.map(mapOrderToUI));
             setProducts(productsRes.results.map(mapProductToUI));
             setCategories(categoriesRes.results);
         } catch (err) {
@@ -145,7 +133,7 @@ export function useSellerData() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [telegramId, storeId]);
 
     useEffect(() => {
         fetchAll();
@@ -157,7 +145,7 @@ export function useSellerData() {
             const apiStatus = statusToApi[uiStatus];
 
             try {
-                const updated = await sellerApi.updateOrderStatus(orderId, apiStatus);
+                const updated = await sellerApi.updateOrderStatus(orderId, telegramId, apiStatus);
                 setOrders((prev) =>
                     prev.map((o) => (o.id === orderId ? mapOrderToUI(updated) : o))
                 );
@@ -170,7 +158,7 @@ export function useSellerData() {
                 return false;
             }
         },
-        []
+        [telegramId]
     );
 
     // --- Product Actions ---
@@ -184,6 +172,7 @@ export function useSellerData() {
         }): Promise<SellerProductUI | null> => {
             try {
                 const created = await sellerApi.createProduct({
+                    telegram_id: telegramId,
                     name: data.name,
                     price: data.price.toString(),
                     unit: data.unit,
@@ -201,7 +190,7 @@ export function useSellerData() {
                 throw err;
             }
         },
-        []
+        [telegramId]
     );
 
     const updateProduct = useCallback(
@@ -216,14 +205,14 @@ export function useSellerData() {
             }>
         ): Promise<SellerProductUI | null> => {
             try {
-                const updateData: Parameters<typeof sellerApi.updateProduct>[1] = {};
+                const updateData: Record<string, unknown> = { telegram_id: telegramId };
                 if (data.name !== undefined) updateData.name = data.name;
                 if (data.price !== undefined) updateData.price = data.price.toString();
                 if (data.unit !== undefined) updateData.unit = data.unit;
                 if (data.categoryId !== undefined) updateData.category = data.categoryId;
                 if (data.isAvailable !== undefined) updateData.is_available = data.isAvailable;
 
-                const updated = await sellerApi.updateProduct(productId, updateData);
+                const updated = await sellerApi.updateProduct(productId, updateData as any);
                 const productUI = mapProductToUI(updated);
                 setProducts((prev) =>
                     prev.map((p) => (p.id === productId ? productUI : p))
@@ -237,12 +226,12 @@ export function useSellerData() {
                 throw err;
             }
         },
-        []
+        [telegramId]
     );
 
     const deleteProduct = useCallback(async (productId: number): Promise<boolean> => {
         try {
-            await sellerApi.deleteProduct(productId);
+            await sellerApi.deleteProduct(productId, telegramId);
             setProducts((prev) => prev.filter((p) => p.id !== productId));
             return true;
         } catch (err) {
@@ -252,7 +241,7 @@ export function useSellerData() {
             console.error('Failed to delete product:', err);
             throw err;
         }
-    }, []);
+    }, [telegramId]);
 
     // --- Clear Error ---
     const clearError = useCallback(() => {
@@ -261,7 +250,6 @@ export function useSellerData() {
 
     return {
         // Data
-        profile,
         orders,
         products,
         categories,
