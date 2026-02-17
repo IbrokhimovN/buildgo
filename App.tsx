@@ -1306,11 +1306,15 @@ export default function App() {
       // 2. Check seller status
       try {
         const result = await checkSeller(tgUser.telegram_id);
-        if (result.is_seller && result.seller) {
+        if (result.is_seller && result.seller && result.seller.is_active && result.seller.store.is_active) {
           setSellerData(result.seller);
           setAppMode('seller');
         } else {
           setAppMode('customer');
+          if (result.is_seller && (!result.seller?.is_active || !result.seller?.store.is_active)) {
+            console.warn('Seller account or store is inactive');
+            // Optionally show a toast here if we had a toast system available in bootstrap phase
+          }
         }
       } catch (err) {
         console.error('Bootstrap failed:', err);

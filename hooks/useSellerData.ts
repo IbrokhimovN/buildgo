@@ -114,22 +114,47 @@ export function useSellerData(telegramId: number, storeId: number) {
         setError(null);
 
         try {
-            const [ordersRes, productsRes, categoriesRes] = await Promise.all([
+            const [ordersResult, productsResult, categoriesResult] = await Promise.allSettled([
                 sellerApi.getOrders(telegramId),
                 sellerApi.getProducts(storeId),
-                sellerApi.getCategories(storeId).catch(() => ({ results: [] as ApiCategory[] })),
+                sellerApi.getCategories(storeId),
             ]);
 
-            // Orders come as array (not paginated)
-            const ordersArray = Array.isArray(ordersRes) ? ordersRes : [];
-            setOrders(ordersArray.map(mapOrderToUI));
-            setProducts(productsRes.results.map(mapProductToUI));
-            setCategories(categoriesRes.results);
+            // Handle Orders
+            if (ordersResult.status === 'fulfilled') {
+                const ordersRes = ordersResult.value;
+                const ordersArray = Array.isArray(ordersRes) ? ordersRes : [];
+                setOrders(ordersArray.map(mapOrderToUI));
+            } else {
+                console.error('Failed to fetch orders:', ordersResult.reason);
+                // We don't set global error here to avoid blocking product management
+                // But if it's a critical auth error, we might want to notify
+                if (ordersResult.reason instanceof ApiError && ordersResult.reason.message === 'Not a seller') {
+                    setError("Sotuvchi sifatida tasdiqlanmagan (Orders API)");
+                }
+            }
+
+            // Handle Products
+            if (productsResult.status === 'fulfilled') {
+                setProducts(productsResult.value.results.map(mapProductToUI));
+            } else {
+                console.error('Failed to fetch products:', productsResult.reason);
+                const message = productsResult.reason instanceof ApiError ? productsResult.reason.message : "Mahsulotlarni yuklashda xatolik";
+                setError(message); // Products are critical
+            }
+
+            // Handle Categories
+            if (categoriesResult.status === 'fulfilled') {
+                setCategories(categoriesResult.value.results);
+            } else {
+                // Categories are optional/secondary, just log
+                console.error('Failed to fetch categories:', categoriesResult.reason);
+                setCategories([]);
+            }
+
         } catch (err) {
-            const message =
-                err instanceof ApiError ? err.message : "Ma'lumotlarni yuklashda xatolik";
-            setError(message);
-            console.error('Failed to fetch seller data:', err);
+            console.error('Unexpected error in useSellerData:', err);
+            setError("Tizim xatoligi");
         } finally {
             setIsLoading(false);
         }
