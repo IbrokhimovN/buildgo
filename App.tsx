@@ -6,11 +6,13 @@ import {
   buyerApi,
   checkSeller,
   createOrUpdateCustomer,
+  getCustomer,
   ApiStore,
   ApiProduct,
   ApiCategory,
   ApiOrder,
   ApiLocation,
+  ApiCustomer,
   ApiSeller,
   ApiError,
 } from './services/api';
@@ -872,11 +874,271 @@ const OrderSuccessView = ({ order, onContinue }: { order: ApiOrder; onContinue: 
   </div>
 );
 
+// --- Map Location Picker ---
+const MapLocationPicker = ({
+  onSave,
+  onCancel,
+  telegramId,
+}: {
+  onSave: (loc: ApiLocation) => void;
+  onCancel: () => void;
+  telegramId: number;
+}) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
+  const [lat, setLat] = useState(41.2995);
+  const [lng, setLng] = useState(69.2401);
+  const [address, setAddress] = useState('');
+  const [name, setName] = useState('');
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Reverse geocode
+  const reverseGeocode = async (latitude: number, longitude: number) => {
+    setIsGeocoding(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=uz`
+      );
+      const data = await res.json();
+      if (data.display_name) {
+        setAddress(data.display_name);
+      }
+    } catch {
+      // silent
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+    // @ts-ignore
+    const L = window.L;
+    if (!L) return;
+
+    const map = L.map(mapRef.current).setView([lat, lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19,
+    }).addTo(map);
+
+    const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+    marker.on('dragend', () => {
+      const pos = marker.getLatLng();
+      setLat(pos.lat);
+      setLng(pos.lng);
+      reverseGeocode(pos.lat, pos.lng);
+    });
+
+    map.on('click', (e: any) => {
+      marker.setLatLng(e.latlng);
+      setLat(e.latlng.lat);
+      setLng(e.latlng.lng);
+      reverseGeocode(e.latlng.lat, e.latlng.lng);
+    });
+
+    mapInstanceRef.current = map;
+    markerRef.current = marker;
+    reverseGeocode(lat, lng);
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setIsSaving(true);
+    try {
+      const newLoc = await buyerApi.createLocation({
+        telegram_id: telegramId,
+        name: name.trim(),
+        address: address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        latitude: lat,
+        longitude: lng,
+        is_default: false,
+      });
+      onSave(newLoc);
+    } catch (err) {
+      console.error('Failed to save location:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-white dark:bg-background-dark flex flex-col">
+      <header className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 bg-white/90 dark:bg-black/90 backdrop-blur-md">
+        <button onClick={onCancel}>
+          <Icon name="close" className="text-xl" />
+        </button>
+        <h2 className="text-lg font-bold flex-1 text-center pr-6">Xaritadan tanlash</h2>
+      </header>
+
+      <div ref={mapRef} className="flex-1" style={{ minHeight: '300px' }} />
+
+      <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-3">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <Icon name="my_location" className="text-primary text-sm" />
+          {isGeocoding ? (
+            <span className="animate-pulse">Manzil aniqlanmoqda...</span>
+          ) : (
+            <span className="line-clamp-2">{address || 'Xaritadan joyni tanlang'}</span>
+          )}
+        </div>
+
+        <div className="flex items-center rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 h-12 bg-gray-50 dark:bg-gray-800/50">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Manzil nomi (masalan: Uy, Ish)"
+            className="flex-1 bg-transparent border-none focus:ring-0 text-base font-medium px-4"
+          />
+          <Icon name="edit_location" className="pr-3 text-gray-400" />
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={!name.trim() || isSaving}
+          className="w-full bg-primary text-white py-3.5 rounded-xl font-bold text-base shadow-lg shadow-primary/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+        >
+          {isSaving ? (
+            <>
+              <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Saqlanmoqda...
+            </>
+          ) : (
+            <>
+              <Icon name="save" className="text-lg" />
+              Manzilni saqlash
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // --- Profile View ---
 const ProfileView = ({ telegramUser }: { telegramUser: TelegramUser }) => {
   // @ts-ignore
   const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
 
+  const [customer, setCustomer] = useState<ApiCustomer | null>(null);
+  const [isLoadingCustomer, setIsLoadingCustomer] = useState(true);
+  const [profileView, setProfileView] = useState<'main' | 'locations' | 'add_location'>('main');
+  const { locations, isLoading: isLoadingLocations, addLocation, deleteLocation, refetch: refetchLocations } = useLocations(telegramUser.telegram_id);
+
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      setIsLoadingCustomer(true);
+      try {
+        const data = await getCustomer(telegramUser.telegram_id);
+        setCustomer(data);
+      } catch {
+        // silent
+      } finally {
+        setIsLoadingCustomer(false);
+      }
+    };
+    fetchCustomer();
+  }, [telegramUser.telegram_id]);
+
+  const displayName = customer
+    ? `${customer.first_name} ${customer.last_name}`.trim()
+    : `${telegramUser.first_name || ''} ${telegramUser.last_name || ''}`.trim() || 'Foydalanuvchi';
+
+  const displayPhone = customer?.phone || null;
+
+  // Map picker
+  if (profileView === 'add_location') {
+    return (
+      <MapLocationPicker
+        telegramId={telegramUser.telegram_id}
+        onSave={(loc) => {
+          refetchLocations();
+          setProfileView('locations');
+        }}
+        onCancel={() => setProfileView('locations')}
+      />
+    );
+  }
+
+  // Saved locations view
+  if (profileView === 'locations') {
+    return (
+      <div className="pb-32">
+        <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 p-4 flex items-center">
+          <button onClick={() => setProfileView('main')}>
+            <Icon name="arrow_back_ios" className="text-lg" />
+          </button>
+          <h2 className="text-lg font-bold flex-1 text-center pr-6">Saqlangan manzillar</h2>
+        </header>
+
+        <div className="px-4 mt-4">
+          {isLoadingLocations ? (
+            <div className="text-center py-10">
+              <div className="size-8 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            </div>
+          ) : locations.length === 0 ? (
+            <div className="text-center py-16 flex flex-col items-center gap-3">
+              <div className="size-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                <Icon name="location_off" className="text-3xl text-gray-400" />
+              </div>
+              <p className="text-gray-500">Saqlangan manzillar yo'q</p>
+              <p className="text-gray-400 text-sm">Xaritadan yangi manzil qo'shing</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {locations.map((loc) => (
+                <div
+                  key={loc.id}
+                  className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex items-start gap-3"
+                >
+                  <div className="size-10 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mt-0.5 shrink-0">
+                    <Icon name="location_on" className="text-blue-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm">{loc.name}</p>
+                      {loc.is_default && (
+                        <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">Asosiy</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{loc.address}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Bu manzilni o'chirmoqchimisiz?")) {
+                        deleteLocation(loc.id);
+                      }
+                    }}
+                    className="size-8 flex items-center justify-center rounded-lg hover:bg-red-50 transition-colors shrink-0"
+                  >
+                    <Icon name="delete" className="text-red-400 text-lg" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => setProfileView('add_location')}
+            className="w-full mt-4 p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-500 flex items-center justify-center gap-2 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
+          >
+            <Icon name="add_location" className="text-primary text-lg" />
+            Xaritadan yangi manzil qo'shish
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Main profile view
   return (
     <div className="pb-32">
       <header className="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 p-4">
@@ -885,27 +1147,70 @@ const ProfileView = ({ telegramUser }: { telegramUser: TelegramUser }) => {
 
       <div className="px-4 mt-6">
         {/* User Info Card */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 flex items-center gap-4 mb-6">
-          <div className="size-16 bg-primary/10 rounded-full flex items-center justify-center">
-            <Icon name="person" className="text-3xl text-primary" />
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-100 dark:border-gray-800 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="size-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <Icon name="person" className="text-3xl text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              {isLoadingCustomer ? (
+                <div className="space-y-2">
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-32 animate-pulse" />
+                  <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded w-24 animate-pulse" />
+                </div>
+              ) : (
+                <>
+                  <p className="font-bold text-lg truncate">{displayName}</p>
+                  <p className="text-gray-500 text-sm">
+                    {tgUser?.username ? `@${tgUser.username}` : 'Telegram orqali'}
+                  </p>
+                </>
+              )}
+            </div>
           </div>
-          <div>
-            <p className="font-bold text-lg">
-              {`${telegramUser.first_name || ''} ${telegramUser.last_name || ''}`.trim() || 'Foydalanuvchi'}
-            </p>
-            <p className="text-gray-500 text-sm">
-              {tgUser?.username ? `@${tgUser.username}` : 'Telegram orqali'}
-            </p>
-          </div>
+
+          {/* Phone & Details */}
+          {!isLoadingCustomer && (
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
+              {displayPhone && (
+                <div className="flex items-center gap-3">
+                  <div className="size-9 bg-green-50 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                    <Icon name="call" className="text-green-500 text-lg" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Telefon raqam</p>
+                    <p className="font-semibold text-sm">{displayPhone}</p>
+                  </div>
+                </div>
+              )}
+              {customer && (
+                <div className="flex items-center gap-3">
+                  <div className="size-9 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <Icon name="badge" className="text-blue-500 text-lg" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Telegram ID</p>
+                    <p className="font-semibold text-sm">{customer.telegram_id}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Menu Items */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
-          <button className="w-full p-4 flex items-center gap-4 active:bg-gray-50 dark:active:bg-gray-800 transition-colors">
+          <button
+            onClick={() => setProfileView('locations')}
+            className="w-full p-4 flex items-center gap-4 active:bg-gray-50 dark:active:bg-gray-800 transition-colors"
+          >
             <div className="size-10 bg-blue-50 rounded-xl flex items-center justify-center">
               <Icon name="location_on" className="text-blue-500" />
             </div>
             <span className="flex-1 text-left font-medium">Saqlangan manzillar</span>
+            <span className="bg-gray-100 dark:bg-gray-800 text-xs font-bold px-2.5 py-1 rounded-full">
+              {isLoadingLocations ? '...' : locations.length}
+            </span>
             <Icon name="chevron_right" className="text-gray-400" />
           </button>
           <button className="w-full p-4 flex items-center gap-4 active:bg-gray-50 dark:active:bg-gray-800 transition-colors">

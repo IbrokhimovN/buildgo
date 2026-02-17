@@ -159,6 +159,16 @@ export async function createOrUpdateCustomer(data: {
     return handleResponse<ApiCustomer>(response);
 }
 
+export async function getCustomer(telegramId: number): Promise<ApiCustomer | null> {
+    try {
+        const response = await fetch(`${BASE_URL}/api/customers/?telegram_id=${telegramId}`);
+        if (response.status === 404) return null;
+        return handleResponse<ApiCustomer>(response);
+    } catch {
+        return null;
+    }
+}
+
 // --- Buyer API ---
 
 export const buyerApi = {
