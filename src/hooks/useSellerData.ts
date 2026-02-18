@@ -120,10 +120,18 @@ export function useSellerData(storeId: number) {
         setError(null);
 
         try {
+            // Use seller-scoped endpoints when storeId is unknown (0)
+            // These auto-scope to the seller's store via initData auth
+            const useSellerScoped = !storeId || storeId === 0;
+
             const [ordersResult, productsResult, categoriesResult] = await Promise.allSettled([
                 sellerApi.getOrders(),
-                sellerApi.getProducts(storeId),
-                sellerApi.getCategories(storeId),
+                useSellerScoped
+                    ? sellerApi.getSellerProducts()
+                    : sellerApi.getProducts(storeId),
+                useSellerScoped
+                    ? sellerApi.getSellerCategories()
+                    : sellerApi.getCategories(storeId),
             ]);
 
             // Handle Orders

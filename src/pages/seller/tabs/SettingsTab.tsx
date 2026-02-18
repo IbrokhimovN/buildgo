@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { ApiCustomer } from '@/services/api';
 import Icon from '@/components/ui/Icon';
 import Modal from '@/components/ui/Modal';
 import EmptyState from '@/components/ui/EmptyState';
@@ -9,8 +8,6 @@ import SellerLocationsModal from '../modals/SellerLocationsModal';
 interface SettingsTabProps {
     storeName: string;
     sellerName: string;
-    telegramId: number;
-    customerProfile: ApiCustomer | null;
 }
 
 const SETTINGS_ITEMS = [
@@ -23,7 +20,7 @@ const SETTINGS_ITEMS = [
 ];
 
 const SettingsTab: React.FC<SettingsTabProps> = ({
-    storeName, sellerName, telegramId, customerProfile,
+    storeName, sellerName,
 }) => {
     // Local state — owned by this tab
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -53,8 +50,8 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                                 <Icon name="storefront" className="text-brand text-2xl" />
                             </div>
                             <div>
-                                <p className="font-bold text-lg">{storeName || "Mening Do'konim"}</p>
-                                <p className="text-muted text-sm">Sotuvchi akkaunt</p>
+                                <p className="font-bold text-lg">{storeName || "Do'kon"}</p>
+                                <p className="text-muted text-sm">Sotuvchi: {sellerName}</p>
                             </div>
                         </div>
                     </div>
@@ -82,12 +79,11 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                 onClose={() => setShowProfileModal(false)}
                 sellerName={sellerName}
                 storeName={storeName}
-                customer={customerProfile}
+                customer={null}
             />
             <SellerLocationsModal
                 isOpen={showLocationsModal}
                 onClose={() => setShowLocationsModal(false)}
-                telegramId={telegramId}
             />
             {showSettingsModal && (
                 <Modal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} title={settingsModalTitle}>
@@ -99,3 +95,4 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
 };
 
 export default SettingsTab;
+

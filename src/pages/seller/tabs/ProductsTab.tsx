@@ -9,7 +9,6 @@ import ProductModal from '../modals/ProductModal';
 interface ProductsTabProps {
     products: SellerProductUI[];
     categories: ApiCategory[];
-    telegramId: number;
     onCreateProduct: (data: ProductFormData) => Promise<void>;
     onUpdateProduct: (id: number, data: ProductFormData) => Promise<void>;
     onDeleteProduct: (id: number) => Promise<void>;
@@ -17,7 +16,7 @@ interface ProductsTabProps {
 }
 
 const ProductsTab: React.FC<ProductsTabProps> = ({
-    products, categories, telegramId,
+    products, categories,
     onCreateProduct, onUpdateProduct, onDeleteProduct, onRefetch,
 }) => {
     // Local state — owned by this tab, not the shell
@@ -100,7 +99,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
                 }}
                 onDelete={editingProduct ? async (id) => onDeleteProduct(id) : undefined}
                 onAddCategory={async (name) => {
-                    const cat = await sellerApi.createCategory({ telegram_id: telegramId, name });
+                    const cat = await sellerApi.createCategory({ name });
                     await onRefetch();
                     return cat;
                 }}

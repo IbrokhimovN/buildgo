@@ -421,9 +421,19 @@ export const sellerApi = {
         return publicApi.getStoreCategories(storeId);
     },
 
+    /** Get seller's own categories (authenticated, no storeId needed) */
+    async getSellerCategories(): Promise<PaginatedResponse<ApiCategory>> {
+        return apiFetch('/api/seller/categories/', { auth: true });
+    },
+
     /** Get seller's store products (public endpoint wrapper) */
     async getProducts(storeId: number, page = 1): Promise<PaginatedResponse<ApiProduct>> {
         return publicApi.getStoreProducts(storeId, undefined, page);
+    },
+
+    /** Get seller's own products (authenticated, no storeId needed) */
+    async getSellerProducts(page = 1): Promise<PaginatedResponse<ApiProduct>> {
+        return apiFetch(`/api/seller/products/?page=${page}`, { auth: true });
     },
 
     /** List seller's store locations */

@@ -33,7 +33,6 @@ const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
                         {[
                             { icon: 'person', label: 'Ism-familiya', value: `${customer.first_name} ${customer.last_name}` },
                             { icon: 'call', label: 'Telefon raqam', value: customer.phone },
-                            { icon: 'badge', label: 'Telegram ID', value: customer.telegram_id },
                         ].map((item) => (
                             <div key={item.icon} className="flex items-center gap-3">
                                 <div className="size-10 bg-card rounded-lg flex items-center justify-center text-gray-400">
