@@ -62,7 +62,7 @@ export function isInsideTelegram(): boolean {
 
 /**
  * Base URL for API calls.
- * In Telegram (production): full domain.
- * In local dev (no Telegram context): empty string (Vite proxy handles /api).
+ * Always use relative paths — Vercel rewrites /api/* to https://buildgo.uz/api/*
+ * server-side, avoiding CORS issues. In local dev, Vite proxy does the same.
  */
-export const BASE_URL: string = getInitData() ? 'https://buildgo.uz' : '';
+export const BASE_URL: string = '';
