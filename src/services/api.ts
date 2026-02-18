@@ -186,10 +186,21 @@ async function apiFetch<T>(
         Object.assign(headers, authHeaders);
     }
 
-    const response = await fetch(`${BASE_URL}${url}`, {
-        ...fetchOptions,
-        headers,
-    });
+    let response: Response;
+    try {
+        response = await fetch(`${BASE_URL}${url}`, {
+            ...fetchOptions,
+            headers,
+        });
+    } catch (networkError) {
+        // TypeError: Failed to fetch — happens in Telegram WebView when
+        // network is unreachable, CORS blocks, or mixed-content is rejected.
+        throw new ApiError(
+            "Tarmoq xatoligi. Internet aloqasini tekshiring.",
+            0,
+            { originalError: String(networkError) }
+        );
+    }
 
     // Handle specific error codes
     if (!response.ok) {

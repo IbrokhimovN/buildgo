@@ -1,16 +1,6 @@
 {
     "buildCommand": "npm run build",
     "outputDirectory": "dist",
-    "rewrites": [
-        {
-            "source": "/api/(.*)",
-            "destination": "https://buildgo.uz/api/$1"
-        },
-        {
-            "source": "/(.*)",
-            "destination": "/index.html"
-        }
-    ],
     "headers": [
         {
             "source": "/(.*)",
@@ -20,10 +10,51 @@
                     "value": "nosniff"
                 },
                 {
-                    "key": "X-Frame-Options",
-                    "value": "ALLOWALL"
+                    "key": "Content-Security-Policy",
+                    "value": "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org"
+                },
+                {
+                    "key": "Access-Control-Allow-Origin",
+                    "value": "*"
                 }
             ]
+        },
+        {
+            "source": "/assets/(.*)\\.js",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/javascript; charset=utf-8"
+                }
+            ]
+        },
+        {
+            "source": "/assets/(.*)\\.css",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "text/css; charset=utf-8"
+                }
+            ]
+        },
+        {
+            "source": "/assets/(.*)\\.json",
+            "headers": [
+                {
+                    "key": "Content-Type",
+                    "value": "application/json; charset=utf-8"
+                }
+            ]
+        }
+    ],
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "https://buildgo.uz/api/$1"
+        },
+        {
+            "source": "/((?!assets/).*)",
+            "destination": "/index.html"
         }
     ]
 }
