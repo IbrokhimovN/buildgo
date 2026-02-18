@@ -33,13 +33,6 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({ product, addToC
                     <span className="text-muted text-base ml-1.5 font-medium">so'm / {product.unit}</span>
                 </div>
 
-                {product.description && (
-                    <div className="mt-4 pt-4 border-t border-subtle">
-                        <h3 className="text-sm font-bold text-muted mb-2">Tavsif</h3>
-                        <p className="text-sm leading-relaxed text-gray-800">{product.description}</p>
-                    </div>
-                )}
-
                 {/* Quantity Selector */}
                 <div className="mt-6 flex items-center gap-4 justify-center">
                     <button

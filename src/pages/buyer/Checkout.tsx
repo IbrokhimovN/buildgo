@@ -30,7 +30,7 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({
     const cartTotal = cart.reduce((sum, item) => sum + parseFloat(item.product.price) * item.quantity, 0);
 
     // Group items by store
-    const storeGroups = cart.reduce((groups, item) => {
+    const storeGroups: Record<number, { storeName: string; items: CartItem[] }> = cart.reduce((groups, item) => {
         const storeId = item.product.store;
         if (!groups[storeId]) groups[storeId] = { storeName: item.product.store_name, items: [] };
         groups[storeId].items.push(item);
@@ -61,9 +61,12 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({
             <div className="fixed inset-0 z-modal bg-surface">
                 <PageHeader title="Joylashuvni tanlang" onBack={() => setShowMap(false)} />
                 <MapLocationPicker
-                    onConfirm={(loc) => { setSelectedLocation(loc); setShowMap(false); }}
+                    onSave={async (loc) => {
+                        setSelectedLocation(loc as unknown as ApiLocation);
+                        setShowMap(false);
+                    }}
                     onCancel={() => setShowMap(false)}
-                    existingLocations={locations}
+                    saveLabel="Tanlash"
                 />
             </div>
         );

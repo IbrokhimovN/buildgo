@@ -82,24 +82,25 @@ export default function App() {
 
                 const params = new URLSearchParams(window.location.search);
                 if (params.get('mode') === 'seller') {
-                    // In dev mode, attempt seller endpoint probe
                     try {
-                        const ordersRes = await sellerApi.getOrders();
-                        // If we get here, user is a seller — but we need store info
-                        // Try to get it from the orders or fallback
-                        setSellerStoreId(1); // Dev fallback
-                        setSellerStoreName("Dev Do'kon");
-                        setSellerName('Dev Seller');
-                        setAppMode('seller');
-                        return;
+                        const profileRes = await sellerApi.getProfile();
+                        if (profileRes.is_seller && profileRes.seller) {
+                            setSellerStoreId(profileRes.seller.store.id);
+                            setSellerStoreName(profileRes.seller.store.name);
+                            setSellerName(profileRes.seller.name);
+                        } else {
+                            setSellerStoreId(1);
+                            setSellerStoreName("Dev Do'kon");
+                            setSellerName('Dev Seller');
+                        }
                     } catch {
                         // Not a seller or no auth — fallback to dev seller with mock data
                         setSellerStoreId(1);
                         setSellerStoreName("Dev Do'kon");
                         setSellerName('Dev Seller');
-                        setAppMode('seller');
-                        return;
                     }
+                    setAppMode('seller');
+                    return;
                 }
                 setAppMode('customer');
                 return;
@@ -107,25 +108,20 @@ export default function App() {
 
             setTelegramUser(tgUser);
 
-            // Optimistic seller probe: try to hit a seller endpoint
-            // If it succeeds (200), user is a seller
-            // If 403, user is a customer
-            // If 401, auth failed
+            // Proper seller detection: call seller profile endpoint
+            // If 200 → seller with full store info
+            // If 403 → not a seller → customer mode
+            // If 401 → auth failed
             try {
-                const ordersRes = await sellerApi.getOrders();
-                // Success → user is a seller. Extract store info from first order if available
-                if (ordersRes.results.length > 0) {
-                    const firstOrder = ordersRes.results[0];
-                    setSellerStoreId(firstOrder.store);
-                    setSellerStoreName(firstOrder.store_name);
+                const profileRes = await sellerApi.getProfile();
+                if (profileRes.is_seller && profileRes.seller) {
+                    setSellerStoreId(profileRes.seller.store.id);
+                    setSellerStoreName(profileRes.seller.store.name);
+                    setSellerName(profileRes.seller.name);
+                    setAppMode('seller');
                 } else {
-                    // Seller with no orders — try products endpoint via stores
-                    // We still know they're a seller because endpoint succeeded
-                    setSellerStoreId(0); // Will be resolved below
-                    setSellerStoreName('');
+                    setAppMode('customer');
                 }
-                setSellerName(tgUser.first_name);
-                setAppMode('seller');
             } catch (err) {
                 if (err instanceof AuthError) {
                     setAppMode('auth_error');

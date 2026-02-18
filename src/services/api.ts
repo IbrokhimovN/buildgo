@@ -27,15 +27,14 @@ export interface ApiProduct {
     id: number;
     store: number;
     store_name: string;
-    category: number;
-    category_name: string;
+    category: number | null;
+    category_name: string | null;
     name: string;
     price: string; // Backend sends as string
     unit: 'qop' | 'dona' | 'kg' | 'm';
     image: string | null;
     is_available: boolean;
     created_at: string;
-    description?: string;
 }
 
 export interface ApiLocation {
@@ -186,21 +185,35 @@ async function apiFetch<T>(
         Object.assign(headers, authHeaders);
     }
 
+    // Timeout: abort fetch after 15s to prevent hanging in Telegram WebView
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+
     let response: Response;
     try {
         response = await fetch(`${BASE_URL}${url}`, {
             ...fetchOptions,
             headers,
+            signal: controller.signal,
         });
     } catch (networkError) {
-        // TypeError: Failed to fetch — happens in Telegram WebView when
-        // network is unreachable, CORS blocks, or mixed-content is rejected.
+        clearTimeout(timeoutId);
+        // AbortError from timeout
+        if (networkError instanceof DOMException && networkError.name === 'AbortError') {
+            throw new ApiError(
+                "So'rov vaqti tugadi. Internet aloqasini tekshiring.",
+                0,
+                { originalError: 'Request timeout (15s)' }
+            );
+        }
+        // TypeError: Failed to fetch — network unreachable, CORS, mixed-content
         throw new ApiError(
             "Tarmoq xatoligi. Internet aloqasini tekshiring.",
             0,
             { originalError: String(networkError) }
         );
     }
+    clearTimeout(timeoutId);
 
     // Handle specific error codes
     if (!response.ok) {
@@ -419,6 +432,11 @@ export const sellerApi = {
     /** Get categories for a store (public endpoint wrapper) */
     async getCategories(storeId: number): Promise<PaginatedResponse<ApiCategory>> {
         return publicApi.getStoreCategories(storeId);
+    },
+
+    /** Get seller profile + store info (used during bootstrap) */
+    async getProfile(): Promise<CheckSellerResponse> {
+        return apiFetch('/api/seller/profile/', { auth: true });
     },
 
     /** Get seller's own categories (authenticated, no storeId needed) */
