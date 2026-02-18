@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSellerData } from '@/hooks/useSellerData';
+import { useSellerData, SellerOrderUI } from '@/hooks/useSellerData';
 import { SellerTabState } from '@/types';
 import { ProductFormData } from './types';
 
@@ -19,6 +19,7 @@ interface SellerDashboardProps {
 
 export default function SellerDashboard({ storeId, storeName, sellerName }: SellerDashboardProps) {
     const [activeTab, setActiveTab] = useState<SellerTabState>('DASHBOARD');
+    const [showProductModal, setShowProductModal] = useState(false);
 
     const {
         orders, products, categories, isLoading, error,
@@ -54,15 +55,22 @@ export default function SellerDashboard({ storeId, storeName, sellerName }: Sell
         await deleteProduct(id);
     };
 
+    const handleSelectOrder = (order: SellerOrderUI) => {
+        setActiveTab('ORDERS');
+    };
+
     const renderTab = () => {
         switch (activeTab) {
             case 'DASHBOARD':
                 return (
                     <DashboardTab
+                        products={products}
                         orders={orders}
                         newOrdersCount={newOrdersCount}
                         totalRevenue={totalRevenue}
-                        productsCount={products.length}
+                        onNavigate={setActiveTab}
+                        onAddProduct={() => { setActiveTab('PRODUCTS'); setShowProductModal(true); }}
+                        onSelectOrder={handleSelectOrder}
                     />
                 );
             case 'ORDERS':
