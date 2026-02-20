@@ -39,8 +39,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
             setCategoryId(cat.id);
             setIsAddingCategory(false);
             setNewCategoryName('');
-        } catch {
-            setSaveError("Kategoriya yaratishda xatolik");
+        } catch (err: any) {
+            setSaveError(err?.message || "Kategoriya yaratishda xatolik");
         } finally {
             setIsAddingCat(false);
         }

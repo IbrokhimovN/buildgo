@@ -218,7 +218,30 @@ async function apiFetch<T>(
     // Handle specific error codes
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.detail || `API error: ${response.status}`;
+
+        // Extract validation errors or specific messages
+        let errorMessage = "Xatolik yuz berdi";
+
+        if (typeof errorData === 'string') {
+            errorMessage = errorData;
+        } else if (errorData.error) {
+            errorMessage = errorData.error;
+        } else if (errorData.detail) {
+            errorMessage = errorData.detail;
+        } else if (typeof errorData === 'object' && Object.keys(errorData).length > 0) {
+            // It's likely a DRF validation error object (e.g. { name: ["This field is required."] })
+            const firstKey = Object.keys(errorData)[0];
+            const firstError = errorData[firstKey];
+            if (Array.isArray(firstError)) {
+                errorMessage = `${firstKey}: ${firstError[0]}`;
+            } else if (typeof firstError === 'string') {
+                errorMessage = `${firstKey}: ${firstError}`;
+            } else {
+                errorMessage = JSON.stringify(errorData);
+            }
+        } else {
+            errorMessage = `API error: ${response.status}`;
+        }
 
         switch (response.status) {
             case 401:

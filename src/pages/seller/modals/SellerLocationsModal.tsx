@@ -25,8 +25,8 @@ const SellerLocationsModal: React.FC<SellerLocationsModalProps> = ({ isOpen, onC
         try {
             const locs = await sellerApi.getLocations();
             setLocations(locs);
-        } catch {
-            setError("Manzillarni yuklashda xatolik");
+        } catch (err: any) {
+            setError(err?.message || "Manzillarni yuklashda xatolik");
         } finally {
             setIsLoading(false);
         }
@@ -37,8 +37,8 @@ const SellerLocationsModal: React.FC<SellerLocationsModalProps> = ({ isOpen, onC
         try {
             await sellerApi.deleteLocation(id);
             setLocations(prev => prev.filter(l => l.id !== id));
-        } catch {
-            alert("O'chirishda xatolik");
+        } catch (err: any) {
+            alert(err?.message || "O'chirishda xatolik");
         }
     };
 

@@ -198,6 +198,8 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
                 latitude: lat,
                 longitude: lng
             });
+        } catch (err: any) {
+            alert(err?.message || "Saqlashda xatolik yuz berdi");
         } finally {
             setIsSaving(false);
         }
