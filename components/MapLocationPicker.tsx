@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useRef } from 'react';
+
 import { ApiLocation } from '../services/api';
 
 // Leaflet is loaded via CDN in index.html
