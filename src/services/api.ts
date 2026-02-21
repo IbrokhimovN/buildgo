@@ -329,7 +329,11 @@ export const buyerApi = {
 
     /** List customer's saved locations */
     async getLocations(): Promise<ApiLocation[]> {
-        return apiFetch('/api/locations/', { auth: true });
+        const res: any = await apiFetch('/api/locations/', { auth: true });
+        if (res && typeof res === 'object' && 'results' in res) {
+            return res.results;
+        }
+        return res || [];
     },
 
     /** Create a new customer location */
@@ -479,7 +483,11 @@ export const sellerApi = {
 
     /** List seller's store locations */
     async getLocations(): Promise<ApiLocation[]> {
-        return apiFetch('/api/seller/locations/', { auth: true });
+        const res: any = await apiFetch('/api/seller/locations/', { auth: true });
+        if (res && typeof res === 'object' && 'results' in res) {
+            return res.results;
+        }
+        return res || [];
     },
 
     /** Create a store location */

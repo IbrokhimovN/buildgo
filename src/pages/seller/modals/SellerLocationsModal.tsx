@@ -74,7 +74,7 @@ const SellerLocationsModal: React.FC<SellerLocationsModalProps> = ({ isOpen, onC
                             Qayta yuklash
                         </button>
                     </div>
-                ) : locations.length === 0 ? (
+                ) : (!Array.isArray(locations) || locations.length === 0) ? (
                     <div className="text-center py-8">
                         <div className="size-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                             <Icon name="location_off" className="text-gray-400 text-2xl" />
