@@ -38,7 +38,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
     return (
         <>
             <div className="pb-32">
-                <header className="sticky top-0 z-header bg-card/90 backdrop-blur-md p-4 border-b border-subtle">
+                <header className="sticky top-0 z-[50] bg-card/90 backdrop-blur-md p-4 border-b border-subtle">
                     <h1 className="text-2xl font-bold">Sozlamalar</h1>
                 </header>
 

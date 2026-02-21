@@ -15,7 +15,7 @@ const ReportsTab: React.FC<ReportsTabProps> = ({ orders, totalRevenue, newOrders
 
     return (
         <div className="pb-32">
-            <header className="sticky top-0 z-header bg-card/90 backdrop-blur-md p-4 border-b border-subtle">
+            <header className="sticky top-0 z-[50] bg-card/90 backdrop-blur-md p-4 border-b border-subtle">
                 <div className="flex items-center gap-3">
                     <button onClick={onBack} className="min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2">
                         <Icon name="arrow_back" />

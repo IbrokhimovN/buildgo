@@ -16,7 +16,7 @@ const tabs = [
 ] as const;
 
 const TabBar: React.FC<TabBarProps> = ({ currentView, setView, cartItemCount }) => (
-    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[96%] max-w-2xl bg-card/95 backdrop-blur-lg border border-subtle rounded-card px-4 pt-2 pb-3 z-tab-bar">
+    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[96%] max-w-2xl bg-card/95 backdrop-blur-lg border border-subtle rounded-card px-4 pt-2 pb-3 z-[100]">
         <div className="flex justify-between items-center">
             {tabs.map((tab) => {
                 const isActive = currentView === tab.id;

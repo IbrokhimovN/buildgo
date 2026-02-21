@@ -43,7 +43,7 @@ const SearchView: React.FC<SearchViewProps> = ({ onSelectProduct, addToCart, onB
 
     return (
         <div className="min-h-screen bg-surface pb-32">
-            <header className="sticky top-0 z-header bg-card border-b border-subtle">
+            <header className="sticky top-0 z-[50] bg-card border-b border-subtle">
                 <div className="flex items-center p-4">
                     <button onClick={onBack} className="min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2">
                         <Icon name="chevron_left" className="text-3xl font-bold" />

@@ -101,7 +101,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ telegramUser }) => {
     // Main profile view
     return (
         <div className="pb-32">
-            <header className="sticky top-0 z-header bg-card/80 backdrop-blur-md border-b border-subtle p-4">
+            <header className="sticky top-0 z-[50] bg-card/80 backdrop-blur-md border-b border-subtle p-4">
                 <h2 className="text-lg font-bold text-center">Profil</h2>
             </header>
 

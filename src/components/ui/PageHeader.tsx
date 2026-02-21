@@ -9,7 +9,7 @@ interface PageHeaderProps {
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({ title, onBack, rightAction, transparent = false }) => (
-    <header className={`sticky top-0 z-header ${transparent ? 'bg-card/80 backdrop-blur-md' : 'bg-card'} border-b border-subtle p-4 flex items-center justify-between`}>
+    <header className={`sticky top-0 z-[50] ${transparent ? 'bg-card/80 backdrop-blur-md' : 'bg-card'} border-b border-subtle p-4 flex items-center justify-between`}>
         {onBack ? (
             <button
                 onClick={onBack}

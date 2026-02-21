@@ -16,7 +16,7 @@ interface SellerTabBarProps {
 }
 
 const SellerTabBar: React.FC<SellerTabBarProps> = ({ activeTab, setActiveTab }) => (
-    <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-subtle flex justify-around items-center pt-2 pb-6 px-2 z-tab-bar">
+    <nav className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-subtle flex justify-around items-center pt-2 pb-6 px-2 z-[100]">
         {TABS.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={`flex flex-col items-center gap-1 flex-1 min-h-[44px] justify-center ${activeTab === tab.id ? 'text-brand' : 'text-gray-400'}`}>

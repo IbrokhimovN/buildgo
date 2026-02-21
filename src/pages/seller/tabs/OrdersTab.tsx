@@ -31,7 +31,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({ orders, onUpdateStatus }) => {
     return (
         <>
             <div className="pb-32">
-                <header className="sticky top-0 z-header bg-card/90 backdrop-blur-md p-4 border-b border-subtle">
+                <header className="sticky top-0 z-[50] bg-card/90 backdrop-blur-md p-4 border-b border-subtle">
                     <h1 className="text-2xl font-bold">Buyurtmalar</h1>
                     <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
                         {FILTER_OPTIONS.map((filter) => (

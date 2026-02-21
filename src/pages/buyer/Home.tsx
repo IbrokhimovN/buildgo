@@ -23,7 +23,7 @@ const HomeView: React.FC<HomeViewProps> = ({
     onOpenSearch,
 }) => (
     <div className="pb-32">
-        <header className="sticky top-0 z-header bg-card/80 backdrop-blur-md border-b border-subtle p-4 flex items-center justify-between">
+        <header className="sticky top-0 z-[50] bg-card/80 backdrop-blur-md border-b border-subtle p-4 flex items-center justify-between">
             <div className="flex items-center gap-1">
                 <Icon name="location_on" className="text-brand" />
                 <span className="text-sm font-semibold">Toshkent</span>

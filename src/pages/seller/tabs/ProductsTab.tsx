@@ -36,7 +36,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
     return (
         <>
             <div className="pb-32">
-                <header className="sticky top-0 z-header bg-card/90 backdrop-blur-md p-4 border-b border-subtle">
+                <header className="sticky top-0 z-[50] bg-card/90 backdrop-blur-md p-4 border-b border-subtle">
                     {showSearch ? (
                         <div className="flex items-center gap-3">
                             <button onClick={() => { setShowSearch(false); setSearchQuery(''); }} className="min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2">
@@ -80,7 +80,7 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
                 </div>
 
                 <button onClick={openAddProduct}
-                    className="fixed bottom-24 right-6 size-14 bg-brand text-white rounded-full flex items-center justify-center shadow-lg z-header active:scale-[0.95] transition-transform">
+                    className="fixed bottom-24 right-6 size-14 bg-brand text-white rounded-full flex items-center justify-center shadow-lg z-[50] active:scale-[0.95] transition-transform">
                     <Icon name="add" className="text-2xl" />
                 </button>
             </div>

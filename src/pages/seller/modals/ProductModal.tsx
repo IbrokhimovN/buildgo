@@ -100,8 +100,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-modal bg-surface">
-            <header className="sticky top-0 z-header bg-card/90 backdrop-blur-md p-4 flex items-center justify-between border-b border-subtle">
+        <div className="fixed inset-0 z-[200] bg-surface">
+            <header className="sticky top-0 z-[50] bg-card/90 backdrop-blur-md p-4 flex items-center justify-between border-b border-subtle">
                 <div className="flex items-center gap-3">
                     <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2">
                         <Icon name="arrow_back" />

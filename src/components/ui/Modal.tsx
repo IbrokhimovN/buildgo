@@ -12,7 +12,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-modal flex items-end justify-center">
+        <div className="fixed inset-0 z-[200] flex items-end justify-center">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
             <div className="relative bg-card w-full max-w-lg rounded-t-modal max-h-[90vh] overflow-hidden animate-slide-up">
                 <div className="sticky top-0 bg-card p-4 border-b border-subtle flex items-center justify-between">

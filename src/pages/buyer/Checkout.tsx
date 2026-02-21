@@ -58,7 +58,7 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({
 
     if (showMap) {
         return (
-            <div className="fixed inset-0 z-modal bg-surface">
+            <div className="fixed inset-0 z-[200] bg-surface">
                 <PageHeader title="Joylashuvni tanlang" onBack={() => setShowMap(false)} />
                 <MapLocationPicker
                     onSave={async (loc) => {
