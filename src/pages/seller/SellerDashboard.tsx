@@ -77,7 +77,7 @@ export default function SellerDashboard({ storeId, storeName, sellerName }: Sell
                 return (
                     <OrdersTab
                         orders={orders}
-                        updateOrderStatus={updateOrderStatus}
+                        onUpdateStatus={updateOrderStatus}
                     />
                 );
             case 'PRODUCTS':
@@ -96,6 +96,8 @@ export default function SellerDashboard({ storeId, storeName, sellerName }: Sell
                     <ReportsTab
                         orders={orders}
                         totalRevenue={totalRevenue}
+                        newOrdersCount={newOrdersCount}
+                        onBack={() => setActiveTab('DASHBOARD')}
                     />
                 );
             case 'SETTINGS':
@@ -113,7 +115,7 @@ export default function SellerDashboard({ storeId, storeName, sellerName }: Sell
     return (
         <>
             {renderTab()}
-            <SellerTabBar activeTab={activeTab} setActiveTab={setActiveTab} newOrdersCount={newOrdersCount} />
+            <SellerTabBar activeTab={activeTab} setActiveTab={setActiveTab} />
         </>
     );
 }

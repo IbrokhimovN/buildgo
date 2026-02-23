@@ -197,8 +197,8 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
             await onSave({
                 name: name.trim(),
                 address: address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-                latitude: lat,
-                longitude: lng
+                latitude: Number(lat.toFixed(6)),
+                longitude: Number(lng.toFixed(6))
             });
         } finally {
             setIsSaving(false);
