@@ -206,26 +206,26 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-white dark:bg-gray-900 flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col pt-safe-top">
             {/* Header */}
-            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 z-10">
+            <div className="shrink-0 p-4 border-b border-gray-100 flex items-center justify-between bg-white z-10">
                 <h2 className="text-lg font-bold">Xaritadan belgilash</h2>
                 <button
                     onClick={onCancel}
-                    className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full"
+                    className="p-2 bg-gray-100 rounded-full min-h-[44px] min-w-[44px]"
                 >
                     <span className="material-symbols-outlined">close</span>
                 </button>
             </div>
 
             {/* Map Container */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-h-0">
                 <div ref={mapRef} className="w-full h-full z-0" />
 
                 {/* Live Geo Button */}
                 <button
                     onClick={handleLiveGeo}
-                    className="absolute bottom-6 right-6 z-[400] bg-white dark:bg-gray-800 p-3 rounded-full shadow-lg active:scale-95 transition-transform"
+                    className="absolute bottom-6 right-6 z-[400] bg-white p-3 min-h-[44px] min-w-[44px] rounded-full shadow-lg active:scale-95 transition-transform flex items-center justify-center"
                     title="Mening joylashuvim"
                 >
                     <span className="material-symbols-outlined text-primary">my_location</span>
@@ -233,61 +233,62 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
             </div>
 
             {/* Bottom Form */}
-            <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 space-y-4 shadow-xl z-20">
+            <div className="shrink-0 p-4 bg-white border-t border-gray-100 shadow-xl z-20 pb-safe-bottom overflow-y-auto max-h-[55vh]" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div className="space-y-4">
+                    {/* Manual Address Input (Forward Geo) */}
+                    <div>
+                        <label className="text-xs text-gray-500 font-bold block mb-1">Manzilni qidirish</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Manzilni kiriting (masalan: Toshkent, Chorsu)..."
+                                className="w-full bg-gray-50 border-none rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary min-h-[44px]"
+                            />
+                            <span className="material-symbols-outlined absolute left-3 top-3 text-gray-400">search</span>
+                            {isGeocoding && (
+                                <div className="absolute right-3 top-3 size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            )}
+                        </div>
+                    </div>
 
-                {/* Manual Address Input (Forward Geo) */}
-                <div>
-                    <label className="text-xs text-gray-500 font-bold block mb-1">Manzilni qidirish</label>
-                    <div className="relative">
+                    {/* Detected Address */}
+                    <div>
+                        <label className="text-xs text-gray-500 font-bold block mb-1">Aniqlangan manzil</label>
+                        <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-xl border border-dashed border-gray-200">
+                            {address || "Manzil tanlanmagan"}
+                        </p>
+                    </div>
+
+                    {/* Location Name */}
+                    <div>
+                        <label className="text-xs text-gray-500 font-bold block mb-1">Manzil nomi</label>
                         <input
                             type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Manzilni kiriting (masalan: Toshkent, Chorsu)..."
-                            className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl py-3 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Masalan: Uy, Ishxona, Do'kon"
+                            className="w-full bg-gray-50 border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary min-h-[44px]"
                         />
-                        <span className="material-symbols-outlined absolute left-3 top-3 text-gray-400">search</span>
-                        {isGeocoding && (
-                            <div className="absolute right-3 top-3 size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        )}
                     </div>
-                </div>
 
-                {/* Detected Address */}
-                <div>
-                    <label className="text-xs text-gray-500 font-bold block mb-1">Aniqlangan manzil</label>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 p-3 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-                        {address || "Manzil tanlanmagan"}
-                    </p>
+                    {/* Save Button */}
+                    <button
+                        onClick={handleSaveClick}
+                        disabled={isSaving || isGeocoding}
+                        className="w-full bg-primary text-white font-bold py-4 rounded-xl active:scale-[0.98] transition-transform disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
+                    >
+                        {isSaving ? (
+                            <>
+                                <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Saqlanmoqda...
+                            </>
+                        ) : (
+                            saveLabel
+                        )}
+                    </button>
                 </div>
-
-                {/* Location Name */}
-                <div>
-                    <label className="text-xs text-gray-500 font-bold block mb-1">Manzil nomi</label>
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Masalan: Uy, Ishxona, Do'kon"
-                        className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl py-3 px-4 text-sm focus:ring-2 focus:ring-primary"
-                    />
-                </div>
-
-                {/* Save Button */}
-                <button
-                    onClick={handleSaveClick}
-                    disabled={isSaving || isGeocoding}
-                    className="w-full bg-primary text-white font-bold py-4 rounded-xl active:scale-[0.98] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                    {isSaving ? (
-                        <>
-                            <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Saqlanmoqda...
-                        </>
-                    ) : (
-                        saveLabel
-                    )}
-                </button>
             </div>
         </div>
     );

@@ -67,10 +67,17 @@ export interface ApiOrder {
     id: number;
     customer: number;
     customer_name: string;
+    customer_phone?: string;
     store: number;
     store_name: string;
     status: OrderStatus;
     items: ApiOrderItem[];
+    location?: {
+        name: string;
+        address: string;
+        latitude: number | null;
+        longitude: number | null;
+    } | null;
     created_at: string;
     updated_at: string;
 }
@@ -245,7 +252,7 @@ async function apiFetch<T>(
 
         switch (response.status) {
             case 401:
-                throw new AuthError(errorMessage, errorData);
+                throw new AuthError("Session expired. Please close and reopen the Mini App.", errorData);
             case 403:
                 throw new ForbiddenError(errorMessage, errorData);
             case 404:

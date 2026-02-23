@@ -36,6 +36,7 @@ export const statusToUI: Record<ApiOrderStatus, UIOrderStatus> = {
 export interface SellerOrderUI {
     id: number;
     customerName: string;
+    customerPhone: string;
     customerInitials: string;
     productSummary: string;
     quantitySummary: string;
@@ -44,6 +45,7 @@ export interface SellerOrderUI {
     apiStatus: ApiOrderStatus;
     createdAt: string;
     items: ApiOrder['items'];
+    location?: ApiOrder['location'];
 }
 
 export interface SellerProductUI {
@@ -82,6 +84,7 @@ function mapOrderToUI(order: ApiOrder): SellerOrderUI {
     return {
         id: order.id,
         customerName: order.customer_name,
+        customerPhone: order.customer_phone || "Kiritilmagan",
         customerInitials: getInitials(order.customer_name),
         productSummary,
         quantitySummary,
@@ -90,6 +93,7 @@ function mapOrderToUI(order: ApiOrder): SellerOrderUI {
         apiStatus: order.status,
         createdAt: order.created_at,
         items: order.items,
+        location: order.location,
     };
 }
 
