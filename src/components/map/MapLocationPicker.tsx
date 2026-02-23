@@ -206,7 +206,7 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col pt-safe-top">
+        <div className="fixed inset-0 z-[200] bg-white flex flex-col pt-safe-top">
             {/* Header */}
             <div className="shrink-0 p-4 border-b border-gray-100 flex items-center justify-between bg-white z-10">
                 <h2 className="text-lg font-bold">Xaritadan belgilash</h2>
