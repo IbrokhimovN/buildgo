@@ -277,8 +277,8 @@ const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
                     <button
                         onClick={handleSaveClick}
                         disabled={isSaving || isGeocoding}
-                        className="w-full bg-primary text-white font-bold py-4 rounded-xl active:scale-[0.98] transition-transform disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
-                    >
+                        className="w-full bg-green-600 text-white font-bold py-4 rounded-xl active:scale-[0.98] transition-transform disabled:opacity-50 flex items-center justify-center gap-2 min-h-[52px]"
+                        >
                         {isSaving ? (
                             <>
                                 <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
