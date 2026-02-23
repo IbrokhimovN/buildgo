@@ -346,12 +346,15 @@ export const buyerApi = {
     /** Create a new customer location */
     async createLocation(data: {
         name: string;
-        latitude?: number;
-        longitude?: number;
+        latitude?: number | string;
+        longitude?: number | string;
         address: string;
         is_default?: boolean;
     }): Promise<ApiLocation> {
-        return authJsonFetch('/api/locations/', 'POST', data);
+        const payload = { ...data };
+        if (payload.latitude !== undefined) payload.latitude = Number(payload.latitude).toFixed(6);
+        if (payload.longitude !== undefined) payload.longitude = Number(payload.longitude).toFixed(6);
+        return authJsonFetch('/api/locations/', 'POST', payload);
     },
 
     /** Update a customer location */
@@ -360,12 +363,15 @@ export const buyerApi = {
         data: {
             name?: string;
             address?: string;
-            latitude?: number;
-            longitude?: number;
+            latitude?: number | string;
+            longitude?: number | string;
             is_default?: boolean;
         }
     ): Promise<ApiLocation> {
-        return authJsonFetch(`/api/locations/${locationId}/`, 'PATCH', data);
+        const payload = { ...data };
+        if (payload.latitude !== undefined) payload.latitude = Number(payload.latitude).toFixed(6);
+        if (payload.longitude !== undefined) payload.longitude = Number(payload.longitude).toFixed(6);
+        return authJsonFetch(`/api/locations/${locationId}/`, 'PATCH', payload);
     },
 
     /** Delete a customer location */
@@ -500,12 +506,15 @@ export const sellerApi = {
     /** Create a store location */
     async createLocation(data: {
         name: string;
-        latitude?: number;
-        longitude?: number;
+        latitude?: number | string;
+        longitude?: number | string;
         address: string;
         is_default?: boolean;
     }): Promise<ApiLocation> {
-        return authJsonFetch('/api/seller/locations/', 'POST', data);
+        const payload = { ...data };
+        if (payload.latitude !== undefined) payload.latitude = Number(payload.latitude).toFixed(6);
+        if (payload.longitude !== undefined) payload.longitude = Number(payload.longitude).toFixed(6);
+        return authJsonFetch('/api/seller/locations/', 'POST', payload);
     },
 
     /** Update a store location */
@@ -514,12 +523,15 @@ export const sellerApi = {
         data: {
             name?: string;
             address?: string;
-            latitude?: number;
-            longitude?: number;
+            latitude?: number | string;
+            longitude?: number | string;
             is_default?: boolean;
         }
     ): Promise<ApiLocation> {
-        return authJsonFetch(`/api/seller/locations/${locationId}/`, 'PATCH', data);
+        const payload = { ...data };
+        if (payload.latitude !== undefined) payload.latitude = Number(payload.latitude).toFixed(6);
+        if (payload.longitude !== undefined) payload.longitude = Number(payload.longitude).toFixed(6);
+        return authJsonFetch(`/api/seller/locations/${locationId}/`, 'PATCH', payload);
     },
 
     /** Delete a store location */
