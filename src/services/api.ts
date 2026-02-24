@@ -30,8 +30,10 @@ export interface ApiProduct {
     category: number | null;
     category_name: string | null;
     name: string;
+    description: string | null;
     price: string; // Backend sends as string
     unit: 'qop' | 'dona' | 'kg' | 'm';
+    quantity: number;
     image: string | null;
     is_available: boolean;
     created_at: string;
@@ -403,16 +405,20 @@ export const sellerApi = {
     async createProduct(data: {
         category: number;
         name: string;
+        description?: string;
         price: string;
         unit: string;
+        quantity: number;
         image?: File | null;
         is_available?: boolean;
     }): Promise<ApiProduct> {
         const formData = new FormData();
         formData.append('category', String(data.category));
         formData.append('name', data.name);
+        if (data.description !== undefined) formData.append('description', data.description);
         formData.append('price', data.price);
         formData.append('unit', data.unit);
+        formData.append('quantity', String(data.quantity));
         if (data.is_available !== undefined) {
             formData.append('is_available', String(data.is_available));
         }
@@ -433,8 +439,10 @@ export const sellerApi = {
         data: {
             category?: number;
             name?: string;
+            description?: string;
             price?: string;
             unit?: string;
+            quantity?: number;
             image?: File | null;
             is_available?: boolean;
         }
@@ -442,8 +450,10 @@ export const sellerApi = {
         const formData = new FormData();
         if (data.category !== undefined) formData.append('category', String(data.category));
         if (data.name !== undefined) formData.append('name', data.name);
+        if (data.description !== undefined) formData.append('description', data.description);
         if (data.price !== undefined) formData.append('price', data.price);
         if (data.unit !== undefined) formData.append('unit', data.unit);
+        if (data.quantity !== undefined) formData.append('quantity', String(data.quantity));
         if (data.is_available !== undefined) formData.append('is_available', String(data.is_available));
         if (data.image) {
             formData.append('image', data.image);

@@ -51,8 +51,10 @@ export interface SellerOrderUI {
 export interface SellerProductUI {
     id: number;
     name: string;
+    description: string | null;
     price: number;
     unit: string;
+    quantity: number;
     image: string;
     categoryId: number;
     categoryName: string;
@@ -101,8 +103,10 @@ function mapProductToUI(product: ApiProduct): SellerProductUI {
     return {
         id: product.id,
         name: product.name,
+        description: product.description,
         price: parseFloat(product.price),
         unit: product.unit,
+        quantity: product.quantity,
         image: product.image || '',
         categoryId: product.category,
         categoryName: product.category_name,
@@ -200,8 +204,10 @@ export function useSellerData(storeId: number) {
     const createProduct = useCallback(
         async (data: {
             name: string;
+            description?: string;
             price: number;
             unit: string;
+            quantity: number;
             categoryId: number;
             isAvailable?: boolean;
             image?: File | null;
@@ -209,8 +215,10 @@ export function useSellerData(storeId: number) {
             try {
                 const created = await sellerApi.createProduct({
                     name: data.name,
+                    description: data.description,
                     price: data.price.toString(),
                     unit: data.unit,
+                    quantity: data.quantity,
                     category: data.categoryId,
                     is_available: data.isAvailable ?? true,
                     image: data.image,
@@ -233,8 +241,10 @@ export function useSellerData(storeId: number) {
             productId: number,
             data: Partial<{
                 name: string;
+                description: string;
                 price: number;
                 unit: string;
+                quantity: number;
                 categoryId: number;
                 isAvailable: boolean;
                 image: File | null;
@@ -243,8 +253,10 @@ export function useSellerData(storeId: number) {
             try {
                 const updateData: Record<string, unknown> = {};
                 if (data.name !== undefined) updateData.name = data.name;
+                if (data.description !== undefined) updateData.description = data.description;
                 if (data.price !== undefined) updateData.price = data.price.toString();
                 if (data.unit !== undefined) updateData.unit = data.unit;
+                if (data.quantity !== undefined) updateData.quantity = data.quantity;
                 if (data.categoryId !== undefined) updateData.category = data.categoryId;
                 if (data.isAvailable !== undefined) updateData.is_available = data.isAvailable;
                 if (data.image !== undefined) updateData.image = data.image;

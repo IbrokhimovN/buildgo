@@ -18,8 +18,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
     isOpen, onClose, product, categories, onSave, onDelete, onAddCategory,
 }) => {
     const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
     const [price, setPrice] = useState('');
     const [unit, setUnit] = useState('dona');
+    const [quantity, setQuantity] = useState('0');
     const [categoryId, setCategoryId] = useState<number | ''>('');
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -50,13 +52,15 @@ const ProductModal: React.FC<ProductModalProps> = ({
         setSaveError(null);
         if (product) {
             setName(product.name);
+            setDescription(product.description || '');
             setPrice(product.price.toString());
             setUnit(product.unit);
+            setQuantity(product.quantity.toString());
             setCategoryId(product.categoryId);
             setImagePreview(product.image || null);
             setImageFile(null);
         } else {
-            setName(''); setPrice(''); setUnit('dona');
+            setName(''); setDescription(''); setPrice(''); setUnit('dona'); setQuantity('0');
             setCategoryId(categories[0]?.id || '');
             setImagePreview(null); setImageFile(null);
         }
@@ -71,10 +75,18 @@ const ProductModal: React.FC<ProductModalProps> = ({
     };
 
     const handleSave = async () => {
-        if (!name || !price || !categoryId) return;
+        if (!name || !price || !categoryId || !quantity || parseInt(quantity) < 0) return;
         setIsSaving(true); setSaveError(null);
         try {
-            await onSave({ name, price: parseFloat(price) || 0, unit, categoryId: categoryId as number, image: imageFile });
+            await onSave({
+                name,
+                description: description || undefined,
+                price: parseFloat(price) || 0,
+                unit,
+                quantity: parseInt(quantity) || 0,
+                categoryId: categoryId as number,
+                image: imageFile
+            });
             onClose();
         } catch (err) {
             setSaveError(err instanceof Error ? err.message : "Mahsulotni saqlashda xatolik");
@@ -124,6 +136,16 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     <label className="block text-sm font-bold mb-2">Mahsulot nomi *</label>
                     <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Sement M-500"
                         className="w-full p-4 rounded-card border border-subtle bg-card text-gray-900 placeholder-gray-400 outline-none focus:border-brand" />
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm font-bold mb-2">Tavsifi</label>
+                    <textarea
+                        value={description} onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Mahsulot haqida qo'shimcha ma'lumot (ixtiyoriy)"
+                        rows={3}
+                        className="w-full p-4 rounded-card border border-subtle bg-card text-gray-900 placeholder-gray-400 outline-none focus:border-brand"
+                    />
                 </div>
 
                 <div className="mb-4">
@@ -189,7 +211,13 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                 </div>
 
-                <button onClick={handleSave} disabled={!name || !price || !categoryId || isSaving}
+                <div className="mb-4">
+                    <label className="block text-sm font-bold mb-2">Miqdori (sotuvdagi zaxira) *</label>
+                    <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="0" min="0"
+                        className="w-full p-4 rounded-card border border-subtle bg-card text-gray-900 placeholder-gray-400 outline-none focus:border-brand" />
+                </div>
+
+                <button onClick={handleSave} disabled={!name || !price || !categoryId || !quantity || parseInt(quantity) < 0 || isSaving}
                     className="w-full bg-brand text-white py-4 rounded-pill font-bold flex items-center justify-center gap-2 disabled:opacity-50 min-h-[52px] active:scale-[0.98] transition-transform">
                     {isSaving ? <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : (
                         <><Icon name="send" className="text-lg" /> {product ? 'Saqlash' : "Saqlash va e'lon qilish"}</>

@@ -32,8 +32,10 @@ export interface SellerData {
 // ─── Product form data shape ───
 export interface ProductFormData {
     name: string;
+    description?: string;
     price: number;
     unit: string;
+    quantity: number;
     categoryId: number;
     image?: File | null;
 }
