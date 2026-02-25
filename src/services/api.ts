@@ -418,7 +418,7 @@ export const sellerApi = {
         if (data.description !== undefined) formData.append('description', data.description);
         formData.append('price', data.price);
         formData.append('unit', data.unit);
-        formData.append('quantity', String(data.quantity));
+        formData.append('quantity', String(data.quantity !== undefined ? data.quantity : 0));
         if (data.is_available !== undefined) {
             formData.append('is_available', String(data.is_available));
         }
