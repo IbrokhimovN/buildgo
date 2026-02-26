@@ -284,7 +284,7 @@ export default function App() {
                 <TabBar
                     currentView={view}
                     setView={setView}
-                    cartItemCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
+                    cartItemCount={cart.length}
                 />
             )}
         </div>

@@ -44,7 +44,7 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({ product, addToC
                 <div className="mt-6">
                     <div className="flex justify-between items-center mb-4">
                         <span className="text-sm font-bold text-gray-700">Miqdorini tanlang:</span>
-                        <span className="text-sm text-muted">Qoldiq: {product.quantity} ta</span>
+                        <span className="text-sm text-muted">Qoldiq: {product.quantity} dona</span>
                     </div>
                     {product.quantity > 0 ? (
                         <div className="flex items-center gap-4 justify-center">

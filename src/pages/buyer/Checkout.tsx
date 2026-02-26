@@ -121,7 +121,7 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t border-subtle">
                 <button
                     onClick={handleSubmit}
-                    disabled={isSubmitting || cart.length === 0}
+                    disabled={isSubmitting || cart.length === 0 || !selectedLocation}
                     className="w-full bg-brand text-white py-4 rounded-card font-bold text-base flex items-center justify-center gap-2 min-h-[52px] disabled:opacity-50 active:scale-[0.98] transition-transform"
                 >
                     {isSubmitting ? (

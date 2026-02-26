@@ -36,8 +36,14 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                 </div>
 
                 <div className="bg-gray-50 rounded-card p-4">
-                    <p className="text-sm text-muted mb-1">Buyurtma</p>
-                    <p className="font-bold">{order.productSummary}</p>
+                    <p className="text-sm text-muted mb-2">🧾 Buyurtma</p>
+                    <div className="text-sm space-y-1">
+                        {order.items.map((item, idx) => (
+                            <div key={item.id}>
+                                {idx + 1}) {item.product_name} — {item.quantity} dona
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -60,8 +66,17 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     <p className="text-sm text-muted mb-1">Yetkazish manzili</p>
                     {order.location ? (
                         <>
-                            <p className="font-bold mb-1">{order.location.name}</p>
-                            <p className="text-sm">{order.location.address}</p>
+                            <p className="font-bold mb-2">{order.location.name}</p>
+                            <p className="text-sm mb-3">{order.location.address}</p>
+                            <a
+                                href={`https://www.google.com/maps?q=${order.location.latitude},${order.location.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 bg-brand/10 text-brand px-4 py-2 rounded-card text-sm font-bold active:scale-[0.98] transition-transform"
+                            >
+                                <svg className="size-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" /></svg>
+                                Xaritada ko'rish
+                            </a>
                         </>
                     ) : (
                         <p className="font-bold">Manzil ko'rsatilmagan</p>

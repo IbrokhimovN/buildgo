@@ -15,7 +15,13 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onClick }) => (
         </div>
         <div className="flex-1 min-w-0">
             <p className="font-bold text-sm truncate">{order.customerName}</p>
-            <p className="text-muted text-xs truncate">{order.productSummary}</p>
+            <div className="text-muted text-xs mt-1 space-y-0.5">
+                {order.items.map((item, idx) => (
+                    <div key={item.id} className="truncate">
+                        {idx + 1}) {item.product_name} — {item.quantity} dona
+                    </div>
+                ))}
+            </div>
         </div>
         <div className="text-right shrink-0">
             <p className="font-bold text-sm">{order.totalPrice.toLocaleString()} so'm</p>
