@@ -15,6 +15,9 @@ export interface ApiStore {
     image: string | null;
     is_active: boolean;
     created_at: string;
+    average_rating?: number;
+    ratings_count?: number;
+    is_open?: boolean;
 }
 
 export interface ApiCategory {
@@ -93,12 +96,22 @@ export interface ApiCustomer {
     // Note: telegram_id is write-only, NOT returned in responses
 }
 
+export interface ApiSellerWorkingHour {
+    id?: number;
+    day_of_week: number;
+    open_time: string;
+    close_time: string;
+}
+
 export interface ApiSellerStore {
     id: number;
     name: string;
+    description: string;
+    phone: string;
     image: string | null;
     is_active: boolean;
     created_at: string;
+    working_hours?: ApiSellerWorkingHour[];
 }
 
 export interface ApiSeller {
@@ -311,9 +324,13 @@ export const publicApi = {
         return apiFetch(url);
     },
 
-    /** Search products across all stores */
-    async searchProducts(query: string, page = 1): Promise<PaginatedResponse<ApiProduct>> {
-        return apiFetch(`/api/search/?q=${encodeURIComponent(query)}&page=${page}`);
+    /** Search items universally (Products, Stores, Categories) */
+    async searchProducts(query: string): Promise<{
+        products: ApiProduct[];
+        stores: ApiStore[];
+        categories: ApiCategory[];
+    }> {
+        return apiFetch(`/api/search/?q=${encodeURIComponent(query)}`);
     },
 };
 
@@ -334,6 +351,16 @@ export const buyerApi = {
     /** Get customer's order history */
     async getOrders(page = 1): Promise<PaginatedResponse<ApiOrder>> {
         return apiFetch(`/api/orders/my/?page=${page}`, { auth: true });
+    },
+
+    /** Check if customer has active orders */
+    async hasActiveOrder(): Promise<boolean> {
+        try {
+            const res: any = await apiFetch('/api/customer/active-order/', { auth: true });
+            return res?.has_active_order || false;
+        } catch {
+            return false;
+        }
     },
 
     /** List customer's saved locations */
@@ -382,6 +409,11 @@ export const buyerApi = {
             method: 'DELETE',
             auth: true,
         });
+    },
+
+    /** Rate a store */
+    async rateStore(storeId: number, rating: number): Promise<void> {
+        return authJsonFetch(`/api/stores/${storeId}/rate/`, 'POST', { rating });
     },
 };
 
@@ -549,6 +581,32 @@ export const sellerApi = {
         return apiFetch(`/api/seller/locations/${locationId}/`, {
             method: 'DELETE',
             auth: true,
+        });
+    },
+
+    /** Update seller's own store profile */
+    async updateStore(data: {
+        name?: string;
+        description?: string;
+        phone?: string;
+        image?: File | null;
+        working_hours?: Omit<ApiSellerWorkingHour, 'id'>[];
+    }): Promise<ApiSellerStore> {
+        const formData = new FormData();
+        if (data.name !== undefined) formData.append('name', data.name);
+        if (data.description !== undefined) formData.append('description', data.description);
+        if (data.phone !== undefined) formData.append('phone', data.phone);
+        if (data.image) {
+            formData.append('image', data.image);
+        }
+        if (data.working_hours !== undefined) {
+            formData.append('working_hours_json', JSON.stringify(data.working_hours));
+        }
+
+        return apiFetch('/api/seller/store/', {
+            method: 'PATCH',
+            auth: true,
+            body: formData,
         });
     },
 };

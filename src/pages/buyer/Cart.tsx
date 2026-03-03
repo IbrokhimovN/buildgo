@@ -15,9 +15,10 @@ interface CartViewProps {
     removeFromCart: (productId: number) => void;
     onCheckout: () => void;
     onBack: () => void;
+    isStoreClosed?: boolean;
 }
 
-const CartView: React.FC<CartViewProps> = ({ cart, updateCartQuantity, removeFromCart, onCheckout, onBack }) => {
+const CartView: React.FC<CartViewProps> = ({ cart, updateCartQuantity, removeFromCart, onCheckout, onBack, isStoreClosed }) => {
     const cartTotal = cart.reduce((sum, item) => sum + parseFloat(item.product.price) * item.quantity, 0);
 
     return (
@@ -66,13 +67,20 @@ const CartView: React.FC<CartViewProps> = ({ cart, updateCartQuantity, removeFro
 
                     {/* Cart Summary */}
                     <div className="fixed bottom-[90px] left-0 right-0 px-4 pb-4 pt-3 bg-card border-t border-subtle">
+                        {isStoreClosed && (
+                            <div className="mb-3 p-3 bg-danger-light text-danger text-sm font-semibold rounded-card flex items-start gap-2 border border-red-200">
+                                <Icon name="error_outline" className="text-xl shrink-0 mt-0.5" />
+                                <p>Kechirasiz, tanlangan do'kon hozirda yopiq. Buyurtma berish vaqtincha to'xtatilgan.</p>
+                            </div>
+                        )}
                         <div className="flex justify-between items-center mb-3">
                             <span className="text-muted text-sm font-medium">Jami:</span>
                             <span className="text-xl font-black text-brand">{cartTotal.toLocaleString()} so'm</span>
                         </div>
                         <button
                             onClick={onCheckout}
-                            className="w-full bg-brand text-white py-4 rounded-card font-bold text-base flex items-center justify-center gap-2 min-h-[52px] active:scale-[0.98] transition-transform"
+                            disabled={isStoreClosed}
+                            className="w-full bg-brand text-white py-4 rounded-card font-bold text-base flex items-center justify-center gap-2 min-h-[52px] active:scale-[0.98] transition-transform disabled:opacity-50 disabled:active:scale-100"
                         >
                             <Icon name="shopping_cart_checkout" className="text-xl" />
                             Buyurtma berish

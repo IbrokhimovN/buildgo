@@ -12,6 +12,7 @@ interface CheckoutViewProps {
     onBack: () => void;
     clearCart: () => void;
     submitOrder: () => Promise<ApiOrder>;
+    isStoreClosed?: boolean;
 }
 
 const CheckoutView: React.FC<CheckoutViewProps> = ({
@@ -21,6 +22,7 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({
     onBack,
     clearCart,
     submitOrder,
+    isStoreClosed,
 }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -38,6 +40,10 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({
     }, {} as Record<number, { storeName: string; items: CartItem[] }>);
 
     const handleSubmit = async () => {
+        if (isStoreClosed) {
+            setError("Do'kon hozirda yopiq, buyurtmani rasmiylashtirib bo'lmaydi.");
+            return;
+        }
         setIsSubmitting(true);
         setError(null);
         try {
@@ -77,6 +83,12 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({
             <PageHeader title="Buyurtma berish" onBack={onBack} />
 
             <div className="p-4 space-y-6">
+                {isStoreClosed && (
+                    <div className="p-4 bg-danger-light border border-red-200 text-danger rounded-card text-sm font-semibold flex items-start gap-2">
+                        <Icon name="error_outline" className="text-xl shrink-0 mt-0.5" />
+                        <p>Kechirasiz, tanlangan do'kon hozirda yopiq. Buyurtma berish vaqtincha to'xtatilgan.</p>
+                    </div>
+                )}
                 {error && (
                     <div className="p-4 bg-danger-light border border-red-200 text-danger rounded-card text-sm">{error}</div>
                 )}
@@ -121,8 +133,8 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t border-subtle">
                 <button
                     onClick={handleSubmit}
-                    disabled={isSubmitting || cart.length === 0 || !selectedLocation}
-                    className="w-full bg-brand text-white py-4 rounded-card font-bold text-base flex items-center justify-center gap-2 min-h-[52px] disabled:opacity-50 active:scale-[0.98] transition-transform"
+                    disabled={isSubmitting || cart.length === 0 || !selectedLocation || isStoreClosed}
+                    className="w-full bg-brand text-white py-4 rounded-card font-bold text-base flex items-center justify-center gap-2 min-h-[52px] disabled:opacity-50 active:scale-[0.98] disabled:active:scale-100 transition-transform"
                 >
                     {isSubmitting ? (
                         <div className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

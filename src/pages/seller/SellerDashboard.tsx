@@ -34,8 +34,10 @@ export default function SellerDashboard({ storeId, storeName, sellerName }: Sell
     const handleCreateProduct = async (data: ProductFormData) => {
         await createProduct({
             name: data.name,
+            description: data.description,
             price: data.price,
             unit: data.unit,
+            quantity: data.quantity,
             categoryId: data.categoryId,
             image: data.image,
         });
@@ -44,8 +46,10 @@ export default function SellerDashboard({ storeId, storeName, sellerName }: Sell
     const handleUpdateProduct = async (id: number, data: ProductFormData) => {
         await updateProduct(id, {
             name: data.name,
+            description: data.description,
             price: data.price,
             unit: data.unit,
+            quantity: data.quantity,
             categoryId: data.categoryId,
             image: data.image,
         });

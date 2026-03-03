@@ -21,6 +21,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import AuthErrorScreen from '@/components/ui/AuthErrorScreen';
 import RateLimitScreen from '@/components/ui/RateLimitScreen';
+import AddressConfirmModal from '@/components/buyer/AddressConfirmModal';
 import TabBar from '@/components/buyer/TabBar';
 
 // Buyer Pages
@@ -65,6 +66,7 @@ export default function App() {
     const [selectedStore, setSelectedStore] = useState<ApiStore | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<ApiProduct | null>(null);
     const [previousView, setPreviousView] = useState<ViewState>('HOME');
+    const [showAddressConfirm, setShowAddressConfirm] = useState(false);
 
     // Bootstrap: determine if user is seller via optimistic probe
     useEffect(() => {
@@ -121,6 +123,9 @@ export default function App() {
                     setAppMode('seller');
                 } else {
                     setAppMode('customer');
+                    buyerApi.hasActiveOrder().then(hasOrder => {
+                        if (!hasOrder) setShowAddressConfirm(true);
+                    });
                 }
             } catch (err) {
                 if (err instanceof AuthError) {
@@ -128,6 +133,9 @@ export default function App() {
                 } else if (err instanceof ForbiddenError) {
                     // Not a seller → customer mode
                     setAppMode('customer');
+                    buyerApi.hasActiveOrder().then(hasOrder => {
+                        if (!hasOrder) setShowAddressConfirm(true);
+                    });
                 } else if (err instanceof RateLimitError) {
                     setRateLimitRetry(err.retryAfter);
                     setAppMode('rate_limited');
@@ -191,6 +199,11 @@ export default function App() {
     }
 
     // ─── CUSTOMER MODE ───
+    const isCartStoreClosed = cart.some(item => {
+        const store = stores.find(s => s.id === item.product.store);
+        return store?.is_open === false;
+    });
+
     const renderContent = () => {
         switch (view) {
             case 'HOME':
@@ -208,6 +221,7 @@ export default function App() {
                 return (
                     <SearchView
                         onSelectProduct={(p) => { setSelectedProduct(p); setPreviousView('SEARCH'); setView('PRODUCT_DETAILS'); }}
+                        onSelectStore={(s) => { setSelectedStore(s); setPreviousView('SEARCH'); setView('STORE_DETAILS'); }}
                         addToCart={addToCart}
                         onBack={() => setView('HOME')}
                     />
@@ -237,6 +251,7 @@ export default function App() {
                         removeFromCart={removeFromCart}
                         onCheckout={() => setView('CHECKOUT')}
                         onBack={() => setView('HOME')}
+                        isStoreClosed={isCartStoreClosed}
                     />
                 );
             case 'CHECKOUT':
@@ -248,6 +263,7 @@ export default function App() {
                         onBack={() => setView('CART')}
                         clearCart={clearCart}
                         submitOrder={submitOrder}
+                        isStoreClosed={isCartStoreClosed}
                     />
                 ) : null;
             case 'ORDER_SUCCESS':
@@ -285,6 +301,14 @@ export default function App() {
                     currentView={view}
                     setView={setView}
                     cartItemCount={cart.length}
+                />
+            )}
+
+            {appMode === 'customer' && (
+                <AddressConfirmModal
+                    isOpen={showAddressConfirm}
+                    onClose={() => setShowAddressConfirm(false)}
+                    onSelectCurrent={() => setShowAddressConfirm(false)}
                 />
             )}
         </div>
