@@ -46,15 +46,10 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 rounded-card p-4">
-                        <p className="text-sm text-muted mb-1">Miqdor</p>
-                        <p className="font-bold">{order.quantitySummary}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-card p-4">
-                        <p className="text-sm text-muted mb-1">Summa</p>
-                        <p className="font-bold text-brand">{order.totalPrice.toLocaleString()} so'm</p>
-                    </div>
+            
+                <div className="bg-gray-50 rounded-card p-4">
+                    <p className="text-sm text-muted mb-1">Summa</p>
+                    <p className="font-bold text-brand">{order.totalPrice.toLocaleString()} so'm</p>
                 </div>
 
                 <div className="bg-gray-50 rounded-card p-4">

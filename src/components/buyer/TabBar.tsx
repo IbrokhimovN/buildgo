@@ -10,8 +10,8 @@ interface TabBarProps {
 
 const tabs = [
     { id: 'HOME', icon: 'home', label: 'Bosh sahifa' },
-    { id: 'SEARCH', icon: 'search', label: 'Qidirish' },
     { id: 'CART', icon: 'shopping_bag', label: 'Savat' },
+    { id: 'ORDERS', icon: 'list_alt', label: 'Buyurtmalar' },
     { id: 'PROFILE', icon: 'person', label: 'Profil' },
 ] as const;
 

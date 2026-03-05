@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiCustomer, sellerApi, ApiSellerStore, ApiSellerWorkingHour } from '@/services/api';
 import Modal from '@/components/ui/Modal';
+import Icon from '@/components/ui/Icon';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 interface SellerProfileModalProps {
@@ -24,6 +25,8 @@ const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [phone, setPhone] = useState('');
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [imageFile, setImageFile] = useState<File | null>(null);
     const [workingHours, setWorkingHours] = useState<ApiSellerWorkingHour[]>([]);
 
     useEffect(() => {
@@ -42,6 +45,8 @@ const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
                 setName(s.name || '');
                 setDescription(s.description || '');
                 setPhone(s.phone || '');
+                setImagePreview(s.image || null);
+                setImageFile(null);
                 setWorkingHours(s.working_hours || []);
             }
         } catch (err: any) {
@@ -55,12 +60,16 @@ const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
         setIsSaving(true);
         setError('');
         try {
-            await sellerApi.updateStore({
+            const payload: any = {
                 name,
                 description,
                 phone,
                 working_hours: workingHours
-            });
+            };
+            if (imageFile) {
+                payload.image = imageFile;
+            }
+            await sellerApi.updateStore(payload);
             onClose();
             // Refresh to reflect the new name in dashboard
             window.location.reload();
@@ -99,6 +108,40 @@ const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
                     {error && <p className="text-red-500 text-sm">{error}</p>}
 
                     <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-semibold mb-1">Do'kon rasmi</label>
+                            <div className="flex items-center gap-4 mt-2">
+                                <div className="size-20 bg-gray-100 rounded-xl overflow-hidden border border-subtle flex items-center justify-center shrink-0">
+                                    {imagePreview ? (
+                                        <img src={imagePreview} alt="Store" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Icon name="storefront" className="text-3xl text-gray-400" />
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        id="storeImageUpload"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                setImageFile(file);
+                                                setImagePreview(URL.createObjectURL(file));
+                                            }
+                                        }}
+                                    />
+                                    <label
+                                        htmlFor="storeImageUpload"
+                                        className="inline-block px-4 py-2 bg-brand-light text-brand text-sm font-semibold rounded-lg cursor-pointer active:scale-95 transition-transform"
+                                    >
+                                        Rasm yuklash
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-sm font-semibold mb-1">Do'kon nomi</label>
                             <input
