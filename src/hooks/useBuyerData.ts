@@ -18,7 +18,7 @@ import {
 } from '@/services/api';
 
 // ─── Stores Hook (public, no auth needed) ───
-export function useStores() {
+export function useStores(categoryId?: number | null) {
     const [stores, setStores] = useState<ApiStore[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function useStores() {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await buyerApi.getStores();
+            const response = await buyerApi.getStores(1, categoryId === null ? undefined : categoryId);
             setStores(response.results);
         } catch (err) {
             const message = err instanceof ApiError ? err.message : "Do'konlarni yuklashda xatolik";
@@ -35,7 +35,7 @@ export function useStores() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [categoryId]);
 
     useEffect(() => {
         fetchStores();
@@ -108,7 +108,7 @@ export function useProductSearch() {
         setError(null);
         try {
             const response = await buyerApi.searchProducts(query);
-            setResults(response.results);
+            setResults(response.products || []);
         } catch (err) {
             const message = err instanceof ApiError ? err.message : 'Qidiruvda xatolik';
             setError(message);

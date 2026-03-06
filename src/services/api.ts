@@ -354,8 +354,15 @@ function authJsonFetch<T>(url: string, method: string, body?: unknown): Promise<
 
 export const publicApi = {
     /** List all active stores */
-    async getStores(page = 1): Promise<PaginatedResponse<ApiStore>> {
-        return apiFetch(`/api/stores/?page=${page}`);
+    async getStores(page = 1, categoryId?: number): Promise<PaginatedResponse<ApiStore>> {
+        let url = `/api/stores/?page=${page}`;
+        if (categoryId) url += `&category_id=${categoryId}`;
+        return apiFetch(url);
+    },
+
+    /** Get global categories */
+    async getCategories(): Promise<PaginatedResponse<ApiCategory>> {
+        return apiFetch(`/api/categories/`);
     },
 
     /** Get categories for a store */
@@ -605,8 +612,8 @@ export const sellerApi = {
     },
 
     /** Get seller analytics */
-    async getAnalytics(): Promise<ApiSellerAnalytics> {
-        return apiFetch('/api/seller/analytics/', { auth: true });
+    async getAnalytics(range: 'daily' | 'weekly' | 'monthly' | 'all' = 'daily'): Promise<ApiSellerAnalytics> {
+        return apiFetch(`/api/seller/analytics/?range=${range}`, { auth: true });
     },
 
     /** Get seller's own categories (authenticated, no storeId needed) */

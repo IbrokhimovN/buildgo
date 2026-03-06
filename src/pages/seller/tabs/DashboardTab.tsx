@@ -6,6 +6,7 @@ import Icon from '@/components/ui/Icon';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import OrderCard from '../components/OrderCard';
+import { BarChart, Bar, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardTabProps {
     products: SellerProductUI[];
@@ -23,13 +24,15 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
 }) => {
     const [analytics, setAnalytics] = React.useState<ApiSellerAnalytics | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [range, setRange] = React.useState<'daily' | 'weekly' | 'monthly' | 'all'>('daily');
 
     React.useEffect(() => {
-        sellerApi.getAnalytics()
+        setIsLoading(true);
+        sellerApi.getAnalytics(range)
             .then(setAnalytics)
             .catch(() => { }) // non-critical error
             .finally(() => setIsLoading(false));
-    }, []);
+    }, [range]);
 
     return (
         <div className="px-4 pb-8">
@@ -44,25 +47,58 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                 </button>
             </div>
 
-            <h3 className="text-muted text-xs font-bold uppercase tracking-wider mb-3">Statistika (Bugun)</h3>
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-muted text-xs font-bold uppercase tracking-wider">Statistika</h3>
+            </div>
+
+            <div className="flex bg-gray-100 p-1 rounded-lg mb-4">
+                {['daily', 'weekly', 'monthly', 'all'].map(r => (
+                    <button
+                        key={r}
+                        onClick={() => setRange(r as any)}
+                        className={`flex-1 text-xs py-1.5 font-bold rounded-md ${range === r ? 'bg-white shadow text-black' : 'text-gray-500 hover:text-gray-700'} transition-all`}
+                    >
+                        {r === 'daily' ? 'Kunlik' : r === 'weekly' ? 'Haftalik' : r === 'monthly' ? 'Oylik' : 'Umumiy'}
+                    </button>
+                ))}
+            </div>
+
             {isLoading ? (
-                <div className="flex justify-center py-4"><LoadingSpinner message="Analitika yuklanmoqda" /></div>
+                <div className="flex justify-center py-8"><LoadingSpinner message="Analitika yuklanmoqda" /></div>
             ) : analytics ? (
                 <>
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div className="bg-card rounded-card p-4 border border-subtle">
-                            <div className="size-10 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                                <Icon name="attach_money" className="text-muted" />
-                            </div>
-                            <p className="text-muted text-xs">Bugungi savdo</p>
-                            <p className="text-lg font-bold mt-1 text-green-600">{analytics.revenue_today.toLocaleString()} so'm</p>
+                    <div className="bg-card rounded-card p-4 border border-subtle mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <p className="text-muted text-xs font-bold uppercase">Savdo aylanmasi ({
+                                range === 'daily' ? 'Bugun' : range === 'weekly' ? 'Shu hafta' : range === 'monthly' ? 'Shu oy' : 'Umumiy'
+                            })</p>
                         </div>
-                        <div onClick={() => onNavigate('ORDERS')} className="bg-card rounded-card p-4 border border-subtle cursor-pointer active:scale-[0.98] transition-transform">
-                            <div className="size-10 bg-brand-light rounded-lg flex items-center justify-center mb-3">
-                                <Icon name="shopping_basket" className="text-brand" />
+                        <p className="text-3xl font-bold">{analytics.revenue_today.toLocaleString()} so'm</p>
+
+                        {(analytics as any).chart && (analytics as any).chart.length > 0 && (
+                            <div className="h-32 w-full mt-6">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={(analytics as any).chart.map((val: number, idx: number) => ({ name: idx, value: val }))}>
+                                        <Tooltip
+                                            formatter={(value: number) => [`${value.toLocaleString()} so'm`, 'Daromad']}
+                                            labelFormatter={() => ''}
+                                            cursor={{ fill: 'transparent' }}
+                                        />
+                                        <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div onClick={() => onNavigate('ORDERS')} className="bg-card rounded-card p-4 border border-subtle cursor-pointer active:scale-[0.98] transition-transform flex flex-col items-center justify-center text-center">
                             <p className="text-muted text-xs">Buyurtmalar</p>
-                            <p className="text-lg font-bold mt-1">{analytics.orders_today} ta</p>
+                            <p className="text-xl font-bold mt-1 text-brand">{analytics.orders_today} ta</p>
+                        </div>
+                        <div className="bg-card rounded-card p-4 border border-subtle flex flex-col items-center justify-center text-center">
+                            <p className="text-muted text-xs">O'rtacha check</p>
+                            <p className="text-xl font-bold mt-1 text-green-600">{((analytics as any).average_check || 0).toLocaleString()} <span className="text-sm">so'm</span></p>
                         </div>
                     </div>
                     {analytics.top_products && analytics.top_products.length > 0 && (
@@ -99,14 +135,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                 </div>
             )}
 
-            <div onClick={() => onNavigate('REPORTS')} className="bg-card rounded-card p-4 border border-subtle mb-6 cursor-pointer active:scale-[0.98] transition-transform">
-                <div className="flex justify-between items-center mb-2">
-                    <p className="text-muted text-sm">Jami daromad</p>
-                    <span className="text-green-600 text-sm font-bold">Yetkazilgan</span>
-                </div>
-                <p className="text-3xl font-bold">{totalRevenue.toLocaleString()} so'm</p>
-            </div>
-
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-muted text-xs font-bold uppercase tracking-wider">Buyurtmalar Boshqaruvi</h3>
                 <button onClick={() => onNavigate('ORDERS')} className="text-brand text-sm font-bold">Hammasi</button>
@@ -121,7 +149,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
                     ))
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 
