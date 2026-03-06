@@ -2,24 +2,29 @@ import React from 'react';
 import Icon from '@/components/ui/Icon';
 import PageHeader from '@/components/ui/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
-import { ApiProduct } from '@/services/api';
+import QuantitySelector from '@/components/ui/QuantitySelector';
+import { ApiProduct, ApiProductVariant } from '@/services/api';
 
 export interface CartItem {
     product: ApiProduct;
+    variant: ApiProductVariant | null;
     quantity: number;
 }
 
 interface CartViewProps {
     cart: CartItem[];
-    updateCartQuantity: (productId: number, quantity: number) => void;
-    removeFromCart: (productId: number) => void;
+    updateCartQuantity: (productId: number, variantId: number | null, quantity: number) => void;
+    removeFromCart: (productId: number, variantId: number | null) => void;
     onCheckout: () => void;
     onBack: () => void;
     isStoreClosed?: boolean;
 }
 
 const CartView: React.FC<CartViewProps> = ({ cart, updateCartQuantity, removeFromCart, onCheckout, onBack, isStoreClosed }) => {
-    const cartTotal = cart.reduce((sum, item) => sum + parseFloat(item.product.price) * item.quantity, 0);
+    const cartTotal = cart.reduce((sum, item) => {
+        const price = item.variant ? item.variant.price : item.product.price;
+        return sum + parseFloat(price) * item.quantity;
+    }, 0);
 
     return (
         <div className="min-h-screen bg-surface pb-32">
@@ -30,39 +35,37 @@ const CartView: React.FC<CartViewProps> = ({ cart, updateCartQuantity, removeFro
             ) : (
                 <>
                     <div className="p-4 space-y-3">
-                        {cart.map(item => (
-                            <div key={item.product.id} className="bg-card rounded-card p-4 border border-subtle flex items-center gap-4">
-                                <div
-                                    className="size-16 rounded-lg bg-gray-100 bg-cover bg-center shrink-0"
-                                    style={{ backgroundImage: item.product.image ? `url(${item.product.image})` : undefined }}
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-sm truncate">{item.product.name}</p>
-                                    <p className="text-brand font-bold mt-0.5 text-sm">{parseFloat(item.product.price).toLocaleString()} so'm</p>
+                        {cart.map(item => {
+                            const key = `${item.product.id}-${item.variant?.id || 'base'}`;
+                            const price = item.variant ? item.variant.price : item.product.price;
+                            // For simplicity, using first variant image if available, else product image
+                            const imgUrl = item.product.images?.length ? item.product.images[0].image : item.product.image;
+
+                            return (
+                                <div key={key} className="bg-card rounded-card p-4 border border-subtle flex items-center gap-4">
+                                    <div
+                                        className="size-16 rounded-lg bg-gray-100 bg-cover bg-center shrink-0"
+                                        style={{ backgroundImage: imgUrl ? `url(${imgUrl})` : undefined }}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-sm truncate">{item.product.name}</p>
+                                        {item.variant && item.variant.attributes.map(attr => (
+                                            <p key={attr.id} className="text-xs text-muted truncate">{attr.attribute_name}: {attr.value}</p>
+                                        ))}
+                                        <p className="text-brand font-bold mt-0.5 text-sm">{parseFloat(price).toLocaleString()} so'm</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <QuantitySelector
+                                            quantity={item.quantity}
+                                            onChange={(newQty) => updateCartQuantity(item.product.id, item.variant ? item.variant.id : null, newQty)}
+                                            onRemove={() => removeFromCart(item.product.id, item.variant ? item.variant.id : null)}
+                                            maxQuantity={item.variant ? item.variant.quantity : item.product.quantity}
+                                            size="sm"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <button
-                                        onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
-                                        className="size-9 border border-subtle rounded-lg flex items-center justify-center"
-                                    >
-                                        <Icon name="remove" className="text-lg" />
-                                    </button>
-                                    <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
-                                    <button
-                                        onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
-                                        className="size-9 border border-subtle rounded-lg flex items-center justify-center"
-                                    >
-                                        <Icon name="add" className="text-lg" />
-                                    </button>
-                                    <button
-                                        onClick={() => removeFromCart(item.product.id)}
-                                        className="size-9 text-danger flex items-center justify-center ml-1"
-                                    >
-                                        <Icon name="delete" className="text-lg" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Cart Summary */}

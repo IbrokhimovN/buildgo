@@ -9,6 +9,7 @@ import {
     buyerApi,
     ApiStore,
     ApiProduct,
+    ApiProductVariant,
     ApiCategory,
     ApiOrder,
     ApiLocation,
@@ -127,10 +128,11 @@ export function useProductSearch() {
 // ─── Cart & Order Hook (localStorage-persisted) ───
 export interface CartItem {
     product: ApiProduct;
+    variant: ApiProductVariant | null;
     quantity: number;
 }
 
-const CART_STORAGE_KEY = 'buildgo_cart';
+const CART_STORAGE_KEY = 'buildgo_cart_v2'; // bumped to clear old carts
 
 function loadCartFromStorage(): CartItem[] {
     try {
@@ -170,40 +172,43 @@ export function useCart() {
         saveCartToStorage(items);
     }, [items]);
 
-    const addItem = useCallback((product: ApiProduct, quantity: number = 1): 'added' | 'conflict' => {
+    const addItem = useCallback((product: ApiProduct, variant: ApiProductVariant | null = null, quantity: number = 1): 'added' | 'conflict' => {
         let result: 'added' | 'conflict' = 'added';
         setItems((prev) => {
             if (prev.length > 0 && prev[0].product.store !== product.store) {
                 result = 'conflict';
                 return prev;
             }
-            const existing = prev.find((item) => item.product.id === product.id);
+            const existing = prev.find((item) =>
+                item.product.id === product.id &&
+                (item.variant ? item.variant.id : null) === (variant ? variant.id : null)
+            );
             if (existing) {
                 return prev.map((item) =>
-                    item.product.id === product.id
+                    (item.product.id === product.id && (item.variant ? item.variant.id : null) === (variant ? variant.id : null))
                         ? { ...item, quantity: item.quantity + quantity }
                         : item
                 );
             }
-            return [...prev, { product, quantity }];
+            return [...prev, { product, variant, quantity }];
         });
         return result;
     }, []);
 
-    const updateQuantity = useCallback((productId: number, quantity: number) => {
+    const updateQuantity = useCallback((productId: number, variantId: number | null, quantity: number) => {
         if (quantity <= 0) {
-            setItems((prev) => prev.filter((item) => item.product.id !== productId));
+            setItems((prev) => prev.filter((item) => !(item.product.id === productId && (item.variant ? item.variant.id : null) === variantId)));
         } else {
             setItems((prev) =>
                 prev.map((item) =>
-                    item.product.id === productId ? { ...item, quantity } : item
+                    (item.product.id === productId && (item.variant ? item.variant.id : null) === variantId) ? { ...item, quantity } : item
                 )
             );
         }
     }, []);
 
-    const removeItem = useCallback((productId: number) => {
-        setItems((prev) => prev.filter((item) => item.product.id !== productId));
+    const removeItem = useCallback((productId: number, variantId: number | null = null) => {
+        setItems((prev) => prev.filter((item) => !(item.product.id === productId && (item.variant ? item.variant.id : null) === variantId)));
     }, []);
 
     const clearCart = useCallback(() => {
@@ -214,7 +219,10 @@ export function useCart() {
 
     const getTotal = useCallback(() => {
         return items.reduce(
-            (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
+            (sum, item) => {
+                const priceMatch = item.variant ? item.variant.price : item.product.price;
+                return sum + parseFloat(priceMatch) * item.quantity;
+            },
             0
         );
     }, [items]);
@@ -238,6 +246,8 @@ export function useCart() {
             setError(null);
 
             try {
+                // If backend updates OrderItems to have variants, we'd pass them here.
+                // Currently OrderItem only takes product. So we just map the product field.
                 const order = await buyerApi.createOrder({
                     store: storeId,
                     items: items.map((item) => ({
@@ -247,7 +257,7 @@ export function useCart() {
                 });
                 clearCart();
                 return order;
-            } catch (err) {
+            } catch (err: unknown) {
                 const message =
                     err instanceof ApiError ? err.message : 'Buyurtma yuborishda xatolik';
                 setError(message);

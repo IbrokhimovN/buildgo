@@ -4,12 +4,14 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import EmptyState from '@/components/ui/EmptyState';
 import PageHeader from '@/components/ui/PageHeader';
-import { buyerApi, ApiStore, ApiProduct, ApiCategory, ApiError } from '@/services/api';
+import VariantSelectorModal from '@/components/ui/VariantSelectorModal';
+import ProductCard from '@/components/ui/ProductCard';
+import { buyerApi, ApiStore, ApiProduct, ApiCategory, ApiError, ApiProductVariant } from '@/services/api';
 
 interface StoreDetailsViewProps {
     store: ApiStore;
     onSelectProduct: (p: ApiProduct) => void;
-    addToCart: (p: ApiProduct, q: number) => void;
+    addToCart: (p: ApiProduct, v: ApiProductVariant | null, q: number) => void;
     onBack: () => void;
 }
 
@@ -19,6 +21,7 @@ const StoreDetailsView: React.FC<StoreDetailsViewProps> = ({ store, onSelectProd
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [activeCat, setActiveCat] = useState<number | null>(null);
+    const [selectedVariantProduct, setSelectedVariantProduct] = useState<ApiProduct | null>(null);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -40,6 +43,15 @@ const StoreDetailsView: React.FC<StoreDetailsViewProps> = ({ store, onSelectProd
     useEffect(() => { fetchData(); }, [store.id]);
 
     const filteredProducts = activeCat ? products.filter(p => p.category === activeCat) : products;
+
+    const handleAddToCartClick = (e: React.MouseEvent, product: ApiProduct) => {
+        e.stopPropagation();
+        if (product.variants && product.variants.length > 0) {
+            setSelectedVariantProduct(product);
+        } else {
+            addToCart(product, null, 1);
+        }
+    };
 
     return (
         <div className="pb-32">
@@ -72,28 +84,25 @@ const StoreDetailsView: React.FC<StoreDetailsViewProps> = ({ store, onSelectProd
             )}
 
             {!isLoading && !error && (
-                <div className="grid grid-cols-2 gap-3 p-4">
+                <div className="grid grid-cols-2 gap-2 p-4">
                     {filteredProducts.map(product => (
-                        <div
+                        <ProductCard
                             key={product.id}
-                            className="bg-card rounded-card overflow-hidden border border-subtle p-3 flex flex-col cursor-pointer active:scale-[0.98] transition-transform"
-                        >
-                            <div
-                                onClick={() => onSelectProduct(product)}
-                                className="aspect-square bg-cover bg-center rounded-lg mb-2 bg-gray-100"
-                                style={{ backgroundImage: product.image ? `url(${product.image})` : undefined }}
-                            />
-                            <p onClick={() => onSelectProduct(product)} className="text-sm font-bold line-clamp-2 h-10">{product.name}</p>
-                            <p className="text-brand text-base font-black mt-1">{parseFloat(product.price).toLocaleString()} so'm</p>
-                            <button
-                                onClick={() => addToCart(product, 1)}
-                                className="mt-3 w-full bg-brand text-white font-bold py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 min-h-[44px]"
-                            >
-                                <Icon name="shopping_cart" className="text-lg" /> Savatga
-                            </button>
-                        </div>
+                            product={product}
+                            onClick={onSelectProduct}
+                            onVariantSelect={setSelectedVariantProduct}
+                        />
                     ))}
                 </div>
+            )}
+
+            {selectedVariantProduct && (
+                <VariantSelectorModal
+                    isOpen={!!selectedVariantProduct}
+                    onClose={() => setSelectedVariantProduct(null)}
+                    product={selectedVariantProduct}
+                    onSelectVariant={(variant, qty) => addToCart(selectedVariantProduct, variant, qty)}
+                />
             )}
         </div>
     );

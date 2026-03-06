@@ -6,6 +6,7 @@ import {
     buyerApi,
     ApiStore,
     ApiProduct,
+    ApiProductVariant,
     ApiOrder,
     ApiSeller,
     ApiError,
@@ -150,13 +151,13 @@ export default function App() {
     }, []);
 
     // Cart helper
-    const addToCart = (product: ApiProduct, quantity: number) => {
-        const result = addItem(product, quantity);
+    const addToCart = (product: ApiProduct, variant: ApiProductVariant | null, quantity: number) => {
+        const result = addItem(product, variant, quantity);
         if (result === 'conflict') {
             const storeName = cart[0]?.product.store_name || "boshqa do'kon";
             if (window.confirm(`Savatingizda "${storeName}" do'konidan mahsulotlar bor. Savatni tozalab, yangi mahsulot qo'shilsinmi?`)) {
                 clearCart();
-                addItem(product, quantity);
+                addItem(product, variant, quantity);
             }
         }
     };
@@ -240,6 +241,7 @@ export default function App() {
                     <ProductDetailsView
                         product={selectedProduct}
                         addToCart={addToCart}
+                        onSelectProduct={(p) => setSelectedProduct(p)}
                         onBack={() => setView(previousView)}
                     />
                 ) : null;

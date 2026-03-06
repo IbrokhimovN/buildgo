@@ -3,27 +3,46 @@ import Icon from '@/components/ui/Icon';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import EmptyState from '@/components/ui/EmptyState';
-import { buyerApi, ApiProduct, ApiStore, ApiCategory, ApiError } from '@/services/api';
+import VariantSelectorModal from '@/components/ui/VariantSelectorModal';
+import ProductCard from '@/components/ui/ProductCard';
+import { buyerApi, ApiProduct, ApiStore, ApiCategory, ApiError, ApiProductVariant } from '@/services/api';
 
 interface SearchViewProps {
     onSelectProduct: (p: ApiProduct) => void;
     onSelectStore: (s: ApiStore) => void;
-    addToCart: (p: ApiProduct, q: number) => void;
+    addToCart: (p: ApiProduct, v: ApiProductVariant | null, q: number) => void;
     onBack: () => void;
 }
 
 const SearchView: React.FC<SearchViewProps> = ({ onSelectProduct, onSelectStore, addToCart, onBack }) => {
     const [query, setQuery] = useState('');
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const [results, setResults] = useState<{ products: ApiProduct[], stores: ApiStore[], categories: ApiCategory[] } | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [selectedVariantProduct, setSelectedVariantProduct] = useState<ApiProduct | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    const fetchSuggestions = async (searchQuery: string) => {
+        if (!searchQuery.trim()) {
+            setSuggestions([]);
+            return;
+        }
+        try {
+            const data = await buyerApi.getSearchSuggestions(searchQuery);
+            setSuggestions(data.suggestions);
+        } catch {
+            // Ignore suggestion errors
+        }
+    };
 
     const handleSearch = async (searchQuery: string) => {
         if (!searchQuery.trim()) {
             setResults(null);
             return;
         }
+        setShowSuggestions(false);
         setIsSearching(true);
         setError(null);
         try {
@@ -41,9 +60,34 @@ const SearchView: React.FC<SearchViewProps> = ({ onSelectProduct, onSelectStore,
     };
 
     useEffect(() => {
-        const debounce = setTimeout(() => handleSearch(query), 300);
-        return () => clearTimeout(debounce);
-    }, [query]);
+        if (query.trim() && showSuggestions) {
+            const debounce = setTimeout(() => fetchSuggestions(query), 300);
+            return () => clearTimeout(debounce);
+        } else {
+            setSuggestions([]);
+        }
+    }, [query, showSuggestions]);
+
+    const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setQuery(e.target.value);
+        setShowSuggestions(true);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleSearch(query);
+            inputRef.current?.blur();
+        }
+    };
+
+    const handleAddToCartClick = (e: React.MouseEvent, product: ApiProduct) => {
+        e.stopPropagation();
+        if (product.variants && product.variants.length > 0) {
+            setSelectedVariantProduct(product);
+        } else {
+            addToCart(product, null, 1);
+        }
+    };
 
     const hasNoResults = results && results.products.length === 0 && results.stores.length === 0 && results.categories.length === 0;
 
@@ -65,13 +109,15 @@ const SearchView: React.FC<SearchViewProps> = ({ onSelectProduct, onSelectStore,
                             ref={inputRef}
                             type="text"
                             value={query}
-                            onChange={(e) => setQuery(e.target.value)}
+                            onChange={handleQueryChange}
+                            onKeyDown={handleKeyDown}
+                            onFocus={() => { if (query) setShowSuggestions(true); }}
                             placeholder="Do'kon, tovar yoki kategoriya..."
                             autoFocus
                             className="flex-1 bg-transparent border-none focus:ring-0 text-base font-medium h-6 outline-none"
                         />
                         {query && (
-                            <button onClick={() => { setQuery(''); setResults(null); }} className="min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">
+                            <button onClick={() => { setQuery(''); setResults(null); setSuggestions([]); }} className="min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">
                                 <Icon name="cancel" className="text-gray-400" filled />
                             </button>
                         )}
@@ -80,14 +126,31 @@ const SearchView: React.FC<SearchViewProps> = ({ onSelectProduct, onSelectStore,
             </header>
 
             <div className="px-4 pt-4">
+                {showSuggestions && suggestions.length > 0 && (
+                    <div className="bg-card rounded-xl border border-subtle overflow-hidden mb-6">
+                        {suggestions.map((sugg, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => {
+                                    setQuery(sugg);
+                                    handleSearch(sugg);
+                                }}
+                                className="w-full text-left px-4 py-3 border-b border-subtle last:border-b-0 flex items-center gap-3 active:bg-gray-50"
+                            >
+                                <Icon name="search" className="text-gray-400 text-sm" />
+                                <span className="font-medium text-[15px]">{sugg}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
                 {isSearching && <LoadingSpinner message="Qidirilmoqda..." />}
                 {error && <ErrorMessage message={error} />}
 
-                {!isSearching && !error && query && hasNoResults && (
+                {!isSearching && !error && query && hasNoResults && !showSuggestions && (
                     <EmptyState icon="search_off" message={`"${query}" bo'yicha hech narsa topilmadi`} />
                 )}
 
-                {!isSearching && !error && results && !hasNoResults && (
+                {!isSearching && !error && results && !hasNoResults && !showSuggestions && (
                     <div className="space-y-6">
                         {results.stores.length > 0 && (
                             <div className="space-y-3">
@@ -146,35 +209,16 @@ const SearchView: React.FC<SearchViewProps> = ({ onSelectProduct, onSelectStore,
                         {results.products.length > 0 && (
                             <div className="space-y-3">
                                 <h2 className="text-lg font-bold">Mahsulotlar ({results.products.length})</h2>
-                                {results.products.map(product => (
-                                    <div
-                                        key={product.id}
-                                        className="bg-card rounded-card p-3 border border-subtle flex items-center gap-4"
-                                    >
-                                        <div
-                                            onClick={() => onSelectProduct(product)}
-                                            className="size-20 rounded-lg bg-cover bg-center shrink-0 bg-gray-100 flex items-center justify-center cursor-pointer"
-                                            style={{ backgroundImage: product.image ? `url(${product.image})` : undefined }}
-                                        >
-                                            {!product.image && <Icon name="inventory_2" className="text-3xl text-gray-400" />}
-                                        </div>
-                                        <div className="flex-1 cursor-pointer" onClick={() => onSelectProduct(product)}>
-                                            <p className="font-bold text-[15px] leading-tight mb-1">{product.name}</p>
-                                            <p className="text-xs text-muted leading-tight mb-2 line-clamp-1">{product.store_name}</p>
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="font-bold text-[15px]">{parseFloat(product.price).toLocaleString()}</span>
-                                                <span className="text-xs text-muted font-medium">so'm/{product.unit}</span>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); addToCart(product, 1); }}
-                                            className="h-10 px-4 bg-brand text-white rounded-lg flex items-center justify-center font-bold text-sm active:scale-[0.95] transition-transform shrink-0"
-                                        >
-                                            <Icon name="add" className="text-xl -ml-1 mr-1" />
-                                            Qo'shish
-                                        </button>
-                                    </div>
-                                ))}
+                                <div className="grid grid-cols-2 gap-2">
+                                    {results.products.map(product => (
+                                        <ProductCard
+                                            key={product.id}
+                                            product={product}
+                                            onClick={onSelectProduct}
+                                            onVariantSelect={setSelectedVariantProduct}
+                                        />
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -184,6 +228,15 @@ const SearchView: React.FC<SearchViewProps> = ({ onSelectProduct, onSelectStore,
                     <EmptyState icon="search" message="Mahsulot, do'kon yoki kategoriya qidirish uchun yozing" />
                 )}
             </div>
+
+            {selectedVariantProduct && (
+                <VariantSelectorModal
+                    isOpen={!!selectedVariantProduct}
+                    onClose={() => setSelectedVariantProduct(null)}
+                    product={selectedVariantProduct}
+                    onSelectVariant={(variant, qty) => addToCart(selectedVariantProduct, variant, qty)}
+                />
+            )}
         </div>
     );
 };

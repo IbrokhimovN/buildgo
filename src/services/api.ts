@@ -26,6 +26,26 @@ export interface ApiCategory {
     store: number;
 }
 
+export interface ApiProductImage {
+    id: number;
+    image: string;
+    order: number;
+}
+
+export interface ApiProductAttribute {
+    id: number;
+    attribute_name: string;
+    value: string;
+}
+
+export interface ApiProductVariant {
+    id: number;
+    sku: string | null;
+    price: string;
+    quantity: number;
+    attributes: ApiProductAttribute[];
+}
+
 export interface ApiProduct {
     id: number;
     store: number;
@@ -35,10 +55,40 @@ export interface ApiProduct {
     name: string;
     description: string | null;
     price: string; // Backend sends as string
+    old_price: string | null;
+    installment_price: string | null;
+    rating: number;
+    reviews_count: number;
     unit: 'qop' | 'dona' | 'kg' | 'm';
     quantity: number;
     image: string | null;
     is_available: boolean;
+    created_at: string;
+    images?: ApiProductImage[];
+    variants?: ApiProductVariant[];
+}
+
+export interface ApiTopProduct {
+    id: number;
+    name: string;
+    sold: number;
+}
+
+export interface ApiSellerAnalytics {
+    orders_today: number;
+    revenue_today: number;
+    top_products: ApiTopProduct[];
+}
+
+export interface ApiSearchSuggestions {
+    suggestions: string[];
+}
+
+export interface ApiCartItem {
+    id: number;
+    product: ApiProduct;
+    variant: ApiProductVariant | null;
+    quantity: number;
     created_at: string;
 }
 
@@ -332,6 +382,18 @@ export const publicApi = {
     }> {
         return apiFetch(`/api/search/?q=${encodeURIComponent(query)}`);
     },
+
+    /** Get search suggestions */
+    async getSearchSuggestions(query: string): Promise<ApiSearchSuggestions> {
+        return apiFetch(`/api/search/suggestions/?q=${encodeURIComponent(query)}`);
+    },
+
+    /** Get related products */
+    async getRelatedProducts(productId: number): Promise<ApiProduct[]> {
+        const res: unknown = await apiFetch(`/api/products/${productId}/related/`);
+        if (Array.isArray(res)) return res as ApiProduct[];
+        return [];
+    },
 };
 
 // ─── Buyer Endpoints (Authenticated via initData) ───
@@ -414,6 +476,27 @@ export const buyerApi = {
     /** Rate a store */
     async rateStore(storeId: number, rating: number): Promise<void> {
         return authJsonFetch(`/api/stores/${storeId}/rate/`, 'POST', { rating });
+    },
+
+    // ─── Cart Endpoints ───
+    async getCart(): Promise<ApiCartItem[]> {
+        return apiFetch('/api/customer/cart/', { auth: true });
+    },
+
+    async addToCart(productId: number, variantId?: number, quantity: number = 1): Promise<ApiCartItem> {
+        return authJsonFetch('/api/customer/cart/', 'POST', { product_id: productId, variant_id: variantId, quantity });
+    },
+
+    async updateCartItem(itemId: number, quantity: number): Promise<ApiCartItem> {
+        return authJsonFetch(`/api/customer/cart/${itemId}/`, 'PATCH', { quantity });
+    },
+
+    async deleteCartItem(itemId: number): Promise<void> {
+        return apiFetch(`/api/customer/cart/${itemId}/`, { method: 'DELETE', auth: true });
+    },
+
+    async clearCart(): Promise<void> {
+        return apiFetch('/api/customer/cart/clear/', { method: 'DELETE', auth: true });
     },
 };
 
@@ -519,6 +602,11 @@ export const sellerApi = {
     /** Get seller profile + store info (used during bootstrap) */
     async getProfile(): Promise<CheckSellerResponse> {
         return apiFetch('/api/seller/profile/', { auth: true });
+    },
+
+    /** Get seller analytics */
+    async getAnalytics(): Promise<ApiSellerAnalytics> {
+        return apiFetch('/api/seller/analytics/', { auth: true });
     },
 
     /** Get seller's own categories (authenticated, no storeId needed) */
