@@ -1,11 +1,36 @@
 /**
  * BuildGo API Service
- * Centralized API layer with X-Telegram-Init-Data header injection.
+ * Centralized API layer with X-Telegram-Init-Data and JWT Bearer token injection.
  * All authenticated requests automatically include the auth header.
  * telegram_id is NEVER sent in query params or request body.
  */
 
 import { BASE_URL, getAuthHeaders } from '@/services/telegram';
+
+// ─── JWT Token Management ───
+
+const TOKEN_KEYS = {
+    access: 'buildgo_access_token',
+    refresh: 'buildgo_refresh_token',
+};
+
+export function getAccessToken(): string | null {
+    return localStorage.getItem(TOKEN_KEYS.access);
+}
+
+export function getRefreshToken(): string | null {
+    return localStorage.getItem(TOKEN_KEYS.refresh);
+}
+
+export function setTokens(access: string, refresh: string): void {
+    localStorage.setItem(TOKEN_KEYS.access, access);
+    localStorage.setItem(TOKEN_KEYS.refresh, refresh);
+}
+
+export function clearTokens(): void {
+    localStorage.removeItem(TOKEN_KEYS.access);
+    localStorage.removeItem(TOKEN_KEYS.refresh);
+}
 
 // ─── Types matching Backend API ───
 
@@ -162,6 +187,9 @@ export interface ApiSellerStore {
     is_active: boolean;
     created_at: string;
     working_hours?: ApiSellerWorkingHour[];
+    status?: 'pending' | 'approved' | 'rejected';
+    legal_name?: string;
+    inn?: string;
 }
 
 export interface ApiSeller {
@@ -251,10 +279,16 @@ async function apiFetch<T>(
         ...(customHeaders as Record<string, string> || {}),
     };
 
-    // Inject auth header for authenticated requests
+    // Inject Telegram auth header for authenticated requests
     if (auth) {
         const authHeaders = getAuthHeaders();
         Object.assign(headers, authHeaders);
+    }
+
+    // Inject JWT Bearer token if available (works alongside Telegram auth)
+    const jwtToken = getAccessToken();
+    if (jwtToken && !headers['Authorization']) {
+        headers['Authorization'] = `Bearer ${jwtToken}`;
     }
 
     // Timeout: abort fetch after 15s to prevent hanging in Telegram WebView
@@ -291,6 +325,47 @@ async function apiFetch<T>(
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
 
+        // ─── Automatic JWT Refresh on 401 ───
+        // If we get a 401 and have a refresh token, attempt to silently refresh
+        // the access token and retry the original request ONCE.
+        if (response.status === 401) {
+            const refreshToken = getRefreshToken();
+            const isRetry = (options as any)._retry;
+
+            if (refreshToken && !isRetry) {
+                try {
+                    // Call refresh endpoint directly via fetch (NOT apiFetch)
+                    // to prevent infinite loops
+                    const refreshResponse = await fetch(`${BASE_URL}/api/auth/token/refresh/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ refresh: refreshToken }),
+                    });
+
+                    if (refreshResponse.ok) {
+                        const refreshData = await refreshResponse.json();
+                        // Save the new access token
+                        localStorage.setItem(TOKEN_KEYS.access, refreshData.access);
+
+                        // Retry the original request with the new token
+                        const retryOptions = {
+                            ...options,
+                            _retry: true,  // Prevent infinite retry loops
+                        };
+                        return apiFetch<T>(url, retryOptions);
+                    }
+                } catch {
+                    // Refresh failed — fall through to logout
+                }
+
+                // Refresh token is also expired/invalid → clear auth state
+                clearTokens();
+                window.dispatchEvent(new CustomEvent('buildgo:logout'));
+            }
+
+            throw new AuthError("Session expired. Please close and reopen the Mini App.", errorData);
+        }
+
         // Extract validation errors or specific messages
         let errorMessage = "Xatolik yuz berdi";
 
@@ -301,7 +376,6 @@ async function apiFetch<T>(
         } else if (errorData.detail) {
             errorMessage = errorData.detail;
         } else if (typeof errorData === 'object' && Object.keys(errorData).length > 0) {
-            // It's likely a DRF validation error object (e.g. { name: ["This field is required."] })
             const firstKey = Object.keys(errorData)[0];
             const firstError = errorData[firstKey];
             if (Array.isArray(firstError)) {
@@ -316,8 +390,6 @@ async function apiFetch<T>(
         }
 
         switch (response.status) {
-            case 401:
-                throw new AuthError("Session expired. Please close and reopen the Mini App.", errorData);
             case 403:
                 throw new ForbiddenError(errorMessage, errorData);
             case 404:
@@ -703,5 +775,103 @@ export const sellerApi = {
             auth: true,
             body: formData,
         });
+    },
+};
+
+// ─── Auth Endpoints (JWT) ───
+
+export const authApi = {
+    /**
+     * Register a new store for the current Telegram user.
+     * Creates User → Store → Seller in one call.
+     */
+    async registerStore(data: { name: string }): Promise<CheckSellerResponse> {
+        return authJsonFetch('/api/auth/register-store/', 'POST', data);
+    },
+
+    /**
+     * Set web password for an authenticated Telegram user.
+     * Requires Telegram initData auth.
+     */
+    async setPassword(data: { phone_number: string; password: string }): Promise<{ message: string; phone_number: string }> {
+        return authJsonFetch('/api/auth/set-password/', 'POST', data);
+    },
+
+    /**
+     * Web login via phone_number + password. Returns JWT tokens.
+     * No Telegram auth required.
+     */
+    async webLogin(data: { phone_number: string; password: string }): Promise<{
+        access: string;
+        refresh: string;
+        user_id: number;
+        phone_number: string;
+    }> {
+        const result = await apiFetch<{
+            access: string;
+            refresh: string;
+            user_id: number;
+            phone_number: string;
+        }>('/api/auth/web-login/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        // Persist tokens
+        setTokens(result.access, result.refresh);
+        return result;
+    },
+
+    /**
+     * Submit store verification documents.
+     * Uses multipart/form-data for file uploads.
+     */
+    async verifyStore(data: {
+        legal_name: string;
+        inn: string;
+        documents: File[];
+        document_types: string[];
+    }): Promise<{
+        message: string;
+        store_status: string;
+        legal_name: string;
+        inn: string;
+        documents: Array<{ id: number; document_type: string; file: string; uploaded_at: string }>;
+    }> {
+        const formData = new FormData();
+        formData.append('legal_name', data.legal_name);
+        formData.append('inn', data.inn);
+        data.documents.forEach((file) => {
+            formData.append('documents', file);
+        });
+        data.document_types.forEach((type) => {
+            formData.append('document_types', type);
+        });
+
+        return apiFetch('/api/auth/verify-store/', {
+            method: 'POST',
+            auth: true,
+            body: formData,
+        });
+    },
+
+    /**
+     * Refresh JWT access token.
+     */
+    async refreshToken(): Promise<{ access: string }> {
+        const refresh = getRefreshToken();
+        if (!refresh) throw new AuthError('No refresh token available');
+        const result = await apiFetch<{ access: string }>('/api/auth/token/refresh/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh }),
+        });
+        localStorage.setItem(TOKEN_KEYS.access, result.access);
+        return result;
+    },
+
+    /** Clear tokens (logout) */
+    logout(): void {
+        clearTokens();
     },
 };

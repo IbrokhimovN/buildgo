@@ -47,6 +47,8 @@ export default function App() {
     const [sellerStoreId, setSellerStoreId] = useState<number>(0);
     const [sellerStoreName, setSellerStoreName] = useState<string>('');
     const [sellerName, setSellerName] = useState<string>('');
+    const [sellerStoreStatus, setSellerStoreStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+    const [sellerStoreInn, setSellerStoreInn] = useState<string>('');
     const [bootError, setBootError] = useState<string | null>(null);
     const [rateLimitRetry, setRateLimitRetry] = useState<number>(30);
     const [view, setView] = useState<ViewState>('HOME');
@@ -91,6 +93,8 @@ export default function App() {
                             setSellerStoreId(profileRes.seller.store.id);
                             setSellerStoreName(profileRes.seller.store.name);
                             setSellerName(profileRes.seller.name);
+                            setSellerStoreStatus(profileRes.seller.store.status || 'pending');
+                            setSellerStoreInn(profileRes.seller.store.inn || '');
                         } else {
                             setSellerStoreId(1);
                             setSellerStoreName("Dev Do'kon");
@@ -121,6 +125,8 @@ export default function App() {
                     setSellerStoreId(profileRes.seller.store.id);
                     setSellerStoreName(profileRes.seller.store.name);
                     setSellerName(profileRes.seller.name);
+                    setSellerStoreStatus(profileRes.seller.store.status || 'pending');
+                    setSellerStoreInn(profileRes.seller.store.inn || '');
                     setAppMode('seller');
                 } else {
                     setAppMode('customer');
@@ -194,6 +200,8 @@ export default function App() {
                     storeId={sellerStoreId}
                     storeName={sellerStoreName}
                     sellerName={sellerName}
+                    storeStatus={sellerStoreStatus}
+                    storeInn={sellerStoreInn}
                 />
             </div>
         );

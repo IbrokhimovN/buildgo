@@ -4,6 +4,8 @@ import Modal from '@/components/ui/Modal';
 import EmptyState from '@/components/ui/EmptyState';
 import SellerProfileModal from '../modals/SellerProfileModal';
 import SellerLocationsModal from '../modals/SellerLocationsModal';
+import StoreVerificationModal from '../modals/StoreVerificationModal';
+import SetWebPasswordModal from '@/components/modals/SetWebPasswordModal';
 
 interface SettingsTabProps {
     storeName: string;
@@ -13,8 +15,9 @@ interface SettingsTabProps {
 const SETTINGS_ITEMS = [
     { icon: 'person', label: 'Profil sozlamalari' },
     { icon: 'location_on', label: "Do'kon manzili" },
+    { icon: 'verified', label: "Do'konni tasdiqlash" },
+    { icon: 'lock', label: 'Web parol' },
     { icon: 'notifications', label: 'Bildirishnomalar' },
-    { icon: 'security', label: 'Xavfsizlik' },
     { icon: 'help', label: 'Yordam markazi' },
     { icon: 'info', label: 'Ilova haqida' },
 ];
@@ -25,12 +28,16 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
     // Local state — owned by this tab
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [showLocationsModal, setShowLocationsModal] = useState(false);
+    const [showVerificationModal, setShowVerificationModal] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [settingsModalTitle, setSettingsModalTitle] = useState('');
 
     const handleOpenSettingsItem = (label: string) => {
         if (label === 'Profil sozlamalari') { setShowProfileModal(true); return; }
         if (label === "Do'kon manzili") { setShowLocationsModal(true); return; }
+        if (label === "Do'konni tasdiqlash") { setShowVerificationModal(true); return; }
+        if (label === 'Web parol') { setShowPasswordModal(true); return; }
         setSettingsModalTitle(label);
         setShowSettingsModal(true);
     };
@@ -85,6 +92,14 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                 isOpen={showLocationsModal}
                 onClose={() => setShowLocationsModal(false)}
             />
+            <StoreVerificationModal
+                isOpen={showVerificationModal}
+                onClose={() => setShowVerificationModal(false)}
+            />
+            <SetWebPasswordModal
+                isOpen={showPasswordModal}
+                onClose={() => setShowPasswordModal(false)}
+            />
             {showSettingsModal && (
                 <Modal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} title={settingsModalTitle}>
                     <EmptyState icon="construction" message="Bu bo'lim tez orada qo'shiladi" />
@@ -95,4 +110,3 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
 };
 
 export default SettingsTab;
-
