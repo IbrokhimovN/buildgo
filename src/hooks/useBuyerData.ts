@@ -1,347 +1,254 @@
 /**
- * useBuyerData - Custom hooks for Buyer App data fetching
- * Uses centralized API client — no telegram_id passing.
- * Cart persisted in localStorage.
+ * hooks/useBuyerData.ts
+ *
+ * Tuzatishlar:
+ * 1. Cart backend bilan sync — localStorage yo'q
+ * 2. 1 cart = 1 store: conflict bo'lsa 409 qaytariladi, frontend hal qiladi
+ * 3. submitOrder: from_cart=true yuboradi
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-    buyerApi,
-    ApiStore,
-    ApiProduct,
-    ApiProductVariant,
-    ApiCategory,
-    ApiOrder,
-    ApiLocation,
-    ApiError,
-    PaginatedResponse,
+  buyerApi,
+  ApiStore, ApiProduct, ApiProductVariant, ApiCategory,
+  ApiOrder, ApiLocation, ApiCartItem, ApiCartResponse,
+  ApiError, ConflictError,
 } from '@/services/api';
 
-// ─── Stores Hook (public, no auth needed) ───
+// ─── Stores ──────────────────────────────────────────────────
+
 export function useStores(categoryId?: number | null) {
-    const [stores, setStores] = useState<ApiStore[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  const [stores, setStores] = useState<ApiStore[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const fetchStores = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await buyerApi.getStores(1, categoryId === null ? undefined : categoryId);
-            setStores(response.results);
-        } catch (err) {
-            const message = err instanceof ApiError ? err.message : "Do'konlarni yuklashda xatolik";
-            setError(message);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [categoryId]);
+  const fetchStores = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await buyerApi.getStores(1, categoryId === null ? undefined : categoryId);
+      setStores(response.results);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Do'konlarni yuklashda xatolik");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [categoryId]);
 
-    useEffect(() => {
-        fetchStores();
-    }, [fetchStores]);
-
-    return { stores, isLoading, error, refetch: fetchStores };
+  useEffect(() => { fetchStores(); }, [fetchStores]);
+  return { stores, isLoading, error, refetch: fetchStores };
 }
 
-// ─── Store Products Hook (public) ───
+// ─── Store products ───────────────────────────────────────────
+
 export function useStoreProducts(storeId: number | null) {
-    const [products, setProducts] = useState<ApiProduct[]>([]);
-    const [categories, setCategories] = useState<ApiCategory[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const fetchProducts = useCallback(async (categoryId?: number) => {
-        if (!storeId) return;
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await buyerApi.getStoreProducts(storeId, categoryId);
-            setProducts(response.results);
-        } catch (err) {
-            const message = err instanceof ApiError ? err.message : 'Mahsulotlarni yuklashda xatolik';
-            setError(message);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [storeId]);
-
-    const fetchCategories = useCallback(async () => {
-        if (!storeId) return;
-        try {
-            const response = await buyerApi.getStoreCategories(storeId);
-            setCategories(response.results);
-        } catch {
-            // Categories are supplementary, don't block
-        }
-    }, [storeId]);
-
-    useEffect(() => {
-        if (storeId) {
-            fetchProducts();
-            fetchCategories();
-        }
-    }, [storeId, fetchProducts, fetchCategories]);
-
-    return {
-        products,
-        categories,
-        isLoading,
-        error,
-        fetchProducts,
-        refetch: () => fetchProducts(),
-    };
-}
-
-// ─── Search Products Hook (public) ───
-export function useProductSearch() {
-    const [results, setResults] = useState<ApiProduct[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const search = useCallback(async (query: string) => {
-        if (!query.trim()) {
-            setResults([]);
-            return;
-        }
-        setIsSearching(true);
-        setError(null);
-        try {
-            const response = await buyerApi.searchProducts(query);
-            setResults(response.products || []);
-        } catch (err) {
-            const message = err instanceof ApiError ? err.message : 'Qidiruvda xatolik';
-            setError(message);
-        } finally {
-            setIsSearching(false);
-        }
-    }, []);
-
-    const clearResults = useCallback(() => {
-        setResults([]);
-        setError(null);
-    }, []);
-
-    return { results, isSearching, error, search, clearResults };
-}
-
-// ─── Cart & Order Hook (localStorage-persisted) ───
-export interface CartItem {
-    product: ApiProduct;
-    variant: ApiProductVariant | null;
-    quantity: number;
-}
-
-const CART_STORAGE_KEY = 'buildgo_cart_v2'; // bumped to clear old carts
-
-function loadCartFromStorage(): CartItem[] {
+  const fetchProducts = useCallback(async (categoryId?: number) => {
+    if (!storeId) return;
+    setIsLoading(true);
+    setError(null);
     try {
-        const raw = localStorage.getItem(CART_STORAGE_KEY);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed;
-    } catch {
-        return [];
+      const response = await buyerApi.getStoreProducts(storeId, categoryId);
+      setProducts(response.results);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Mahsulotlarni yuklashda xatolik');
+    } finally {
+      setIsLoading(false);
     }
+  }, [storeId]);
+
+  const fetchCategories = useCallback(async () => {
+    if (!storeId) return;
+    try {
+      const response = await buyerApi.getStoreCategories(storeId);
+      setCategories(response.results);
+    } catch {}
+  }, [storeId]);
+
+  useEffect(() => {
+    if (storeId) { fetchProducts(); fetchCategories(); }
+  }, [storeId, fetchProducts, fetchCategories]);
+
+  return { products, categories, isLoading, error, fetchProducts, refetch: () => fetchProducts() };
 }
 
-function saveCartToStorage(items: CartItem[]): void {
-    try {
-        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-    } catch {
-        // Storage quota exceeded — silently fail
-    }
-}
+// ─── Cart — backend bilan to'liq sync ────────────────────────
 
-function clearCartStorage(): void {
-    try {
-        localStorage.removeItem(CART_STORAGE_KEY);
-    } catch {
-        // Ignore
-    }
-}
+export type CartConflictInfo = {
+  existingStoreName: string;
+  newStoreName: string;
+  productToAdd: ApiProduct;
+  variantToAdd: ApiProductVariant | null;
+  quantityToAdd: number;
+};
 
 export function useCart() {
-    const [items, setItems] = useState<CartItem[]>(() => loadCartFromStorage());
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<ApiCartItem[]>([]);
+  const [cartStore, setCartStore] = useState<{ id: number; name: string; image: string | null } | null>(null);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [conflict, setConflict] = useState<CartConflictInfo | null>(null);
 
-    // Persist cart whenever it changes
-    useEffect(() => {
-        saveCartToStorage(items);
-    }, [items]);
+  // Backend dan cart ni yuklash
+  const fetchCart = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res: ApiCartResponse = await buyerApi.getCart();
+      setItems(res.items || []);
+      setCartStore(res.store || null);
+      setTotal(res.total || 0);
+    } catch {
+      setItems([]);
+      setCartStore(null);
+      setTotal(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-    const addItem = useCallback((product: ApiProduct, variant: ApiProductVariant | null = null, quantity: number = 1): 'added' | 'conflict' => {
-        let result: 'added' | 'conflict' = 'added';
-        setItems((prev) => {
-            if (prev.length > 0 && prev[0].product.store !== product.store) {
-                result = 'conflict';
-                return prev;
-            }
-            const existing = prev.find((item) =>
-                item.product.id === product.id &&
-                (item.variant ? item.variant.id : null) === (variant ? variant.id : null)
-            );
-            if (existing) {
-                return prev.map((item) =>
-                    (item.product.id === product.id && (item.variant ? item.variant.id : null) === (variant ? variant.id : null))
-                        ? { ...item, quantity: item.quantity + quantity }
-                        : item
-                );
-            }
-            return [...prev, { product, variant, quantity }];
+  useEffect(() => { fetchCart(); }, [fetchCart]);
+
+  const _updateFromResponse = (res: ApiCartResponse) => {
+    setItems(res.cart?.items || res.items || []);
+    setCartStore(res.cart?.store || res.store || null);
+    setTotal(res.cart?.total || res.total || 0);
+  };
+
+  /**
+   * Mahsulot qo'shish.
+   * 409 bo'lsa → conflict state yangilanadi, frontend Modal ko'rsatadi.
+   * Foydalanuvchi "Ha" desa → clearAndAdd() chaqiriladi.
+   */
+  const addItem = useCallback(async (
+    product: ApiProduct,
+    variant: ApiProductVariant | null,
+    quantity: number
+  ): Promise<'ok' | 'conflict' | 'error'> => {
+    try {
+      const res = await buyerApi.addToCart(product.id, variant?.id, quantity);
+      _updateFromResponse(res as any);
+      return 'ok';
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        setConflict({
+          existingStoreName: err.existingStore?.name || cartStore?.name || "Boshqa do'kon",
+          newStoreName: err.newStore?.name || product.store_name,
+          productToAdd: product,
+          variantToAdd: variant,
+          quantityToAdd: quantity,
         });
-        return result;
-    }, []);
+        return 'conflict';
+      }
+      return 'error';
+    }
+  }, [cartStore]);
 
-    const updateQuantity = useCallback((productId: number, variantId: number | null, quantity: number) => {
-        if (quantity <= 0) {
-            setItems((prev) => prev.filter((item) => !(item.product.id === productId && (item.variant ? item.variant.id : null) === variantId)));
-        } else {
-            setItems((prev) =>
-                prev.map((item) =>
-                    (item.product.id === productId && (item.variant ? item.variant.id : null) === variantId) ? { ...item, quantity } : item
-                )
-            );
-        }
-    }, []);
+  /** Savatchani tozalab, yangi mahsulot qo'shish */
+  const clearAndAdd = useCallback(async () => {
+    if (!conflict) return;
+    try {
+      await buyerApi.clearCart();
+      const res = await buyerApi.addToCart(
+        conflict.productToAdd.id,
+        conflict.variantToAdd?.id,
+        conflict.quantityToAdd
+      );
+      _updateFromResponse(res as any);
+      setConflict(null);
+    } catch {
+      await fetchCart();
+      setConflict(null);
+    }
+  }, [conflict, fetchCart]);
 
-    const removeItem = useCallback((productId: number, variantId: number | null = null) => {
-        setItems((prev) => prev.filter((item) => !(item.product.id === productId && (item.variant ? item.variant.id : null) === variantId)));
-    }, []);
+  const dismissConflict = () => setConflict(null);
 
-    const clearCart = useCallback(() => {
-        setItems([]);
-        clearCartStorage();
-        setError(null);
-    }, []);
+  const updateQuantity = useCallback(async (itemId: number, quantity: number) => {
+    try {
+      if (quantity <= 0) {
+        await buyerApi.deleteCartItem(itemId);
+      } else {
+        await buyerApi.updateCartItem(itemId, quantity);
+      }
+      await fetchCart();
+    } catch {}
+  }, [fetchCart]);
 
-    const getTotal = useCallback(() => {
-        return items.reduce(
-            (sum, item) => {
-                const priceMatch = item.variant ? item.variant.price : item.product.price;
-                return sum + parseFloat(priceMatch) * item.quantity;
-            },
-            0
-        );
-    }, [items]);
+  const removeItem = useCallback(async (itemId: number) => {
+    try {
+      await buyerApi.deleteCartItem(itemId);
+      await fetchCart();
+    } catch {}
+  }, [fetchCart]);
 
-    /**
-     * Submit order — auth handled by API client (no telegramId needed)
-     */
-    const submitOrder = useCallback(
-        async (): Promise<ApiOrder> => {
-            if (items.length === 0) {
-                throw new Error("Savat bo'sh");
-            }
+  const clearCart = useCallback(async () => {
+    try {
+      await buyerApi.clearCart();
+      setItems([]);
+      setCartStore(null);
+      setTotal(0);
+    } catch {}
+  }, []);
 
-            const storeId = items[0].product.store;
-            const allSameStore = items.every((item) => item.product.store === storeId);
-            if (!allSameStore) {
-                throw new Error("Barcha mahsulotlar bitta do'kondan bo'lishi kerak");
-            }
+  const submitOrder = useCallback(async (): Promise<ApiOrder> => {
+    const order = await buyerApi.createOrder({ from_cart: true });
+    setItems([]);
+    setCartStore(null);
+    setTotal(0);
+    return order;
+  }, []);
 
-            setIsSubmitting(true);
-            setError(null);
-
-            try {
-                // If backend updates OrderItems to have variants, we'd pass them here.
-                // Currently OrderItem only takes product. So we just map the product field.
-                const order = await buyerApi.createOrder({
-                    store: storeId,
-                    items: items.map((item) => ({
-                        product: item.product.id,
-                        quantity: item.quantity,
-                    })),
-                });
-                clearCart();
-                return order;
-            } catch (err: unknown) {
-                const message =
-                    err instanceof ApiError ? err.message : 'Buyurtma yuborishda xatolik';
-                setError(message);
-                throw err;
-            } finally {
-                setIsSubmitting(false);
-            }
-        },
-        [items, clearCart]
-    );
-
-    return {
-        items,
-        addItem,
-        updateQuantity,
-        removeItem,
-        clearCart,
-        getTotal,
-        submitOrder,
-        isSubmitting,
-        error,
-        itemCount: items.length,
-    };
+  return {
+    items,
+    cartStore,
+    total,
+    isLoading,
+    conflict,
+    addItem,
+    clearAndAdd,
+    dismissConflict,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    submitOrder,
+    refetch: fetchCart,
+  };
 }
 
-// ─── Locations Hook (authenticated — no telegramId param) ───
+// ─── Locations ───────────────────────────────────────────────
+
 export function useLocations() {
-    const [locations, setLocations] = useState<ApiLocation[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+  const [locations, setLocations] = useState<ApiLocation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-    const fetchLocations = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const data = await buyerApi.getLocations();
-            setLocations(Array.isArray(data) ? data : []);
-        } catch (err) {
-            const message =
-                err instanceof ApiError ? err.message : 'Manzillarni yuklashda xatolik';
-            setError(message);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+  const fetchLocations = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const locs = await buyerApi.getLocations();
+      setLocations(locs);
+    } catch {
+      setLocations([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-    const addLocation = useCallback(
-        async (data: { name: string; address: string; latitude?: number; longitude?: number; is_default?: boolean }) => {
-            try {
-                const newLocation = await buyerApi.createLocation(data);
-                setLocations((prev) => [...prev, newLocation]);
-                return newLocation;
-            } catch (err) {
-                const message =
-                    err instanceof ApiError ? err.message : "Manzil qo'shishda xatolik";
-                setError(message);
-                throw err;
-            }
-        },
-        []
-    );
+  useEffect(() => { fetchLocations(); }, [fetchLocations]);
 
-    const deleteLocation = useCallback(async (locationId: number) => {
-        try {
-            await buyerApi.deleteLocation(locationId);
-            setLocations((prev) => prev.filter((loc) => loc.id !== locationId));
-        } catch (err) {
-            const message =
-                err instanceof ApiError ? err.message : "Manzilni o'chirishda xatolik";
-            setError(message);
-            throw err;
-        }
-    }, []);
+  const addLocation = useCallback(async (data: Parameters<typeof buyerApi.createLocation>[0]) => {
+    const loc = await buyerApi.createLocation(data);
+    setLocations(prev => [...prev, loc]);
+    return loc;
+  }, []);
 
-    useEffect(() => {
-        fetchLocations();
-    }, [fetchLocations]);
+  const deleteLocation = useCallback(async (id: number) => {
+    await buyerApi.deleteLocation(id);
+    setLocations(prev => prev.filter(l => l.id !== id));
+  }, []);
 
-    return {
-        locations,
-        isLoading,
-        error,
-        addLocation,
-        deleteLocation,
-        refetch: fetchLocations,
-    };
+  return { locations, isLoading, addLocation, deleteLocation, refetch: fetchLocations };
 }
